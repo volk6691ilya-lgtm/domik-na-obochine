@@ -2,17 +2,19 @@ import os
 import requests
 
 def main():
-    print("🧠 Тест Google Gemini API (через прямой REST запрос)...")
+    print("🧠 Тест Google Gemini API (модель 2.5 Flash)...")
     
-    # 1. Получаем ключ
+    # 1. Получаем и очищаем ключ
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise Exception("❌ Ключ Gemini не найден в Secrets GitHub!")
     
-    # 2. Формируем прямой URL к API Google (версия v1beta, модель flash)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    api_key = api_key.strip()
     
-    # 3. Создаем правильный JSON-запрос для Gemini
+    # 2. ИСПРАВЛЕНИЕ: Используем модель, которая есть в твоем списке
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    
+    # 3. Создаем запрос
     payload = {
         "contents": [
             {
@@ -35,7 +37,6 @@ def main():
     # 5. Обрабатываем ответ
     if response.status_code == 200:
         data = response.json()
-        # Извлекаем текст из вложенной структуры ответа Gemini
         text = data['candidates'][0]['content']['parts'][0]['text']
         print(f"✅ УСПЕХ! Ответ от Gemini:\n{text}")
     else:
