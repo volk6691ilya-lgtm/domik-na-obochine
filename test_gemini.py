@@ -2,7 +2,7 @@ import os
 import requests
 
 def main():
-    print("🧠 Тест Google Gemini API (модель flash-latest - бесплатный тариф)...")
+    print("🧠 Тест Google Gemini API (модель 3.5 Flash - свежая и бесплатная)...")
     
     # 1. Получаем и очищаем ключ
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -11,8 +11,8 @@ def main():
     
     api_key = api_key.strip()
     
-    # 2. ИСПРАВЛЕНИЕ: Используем gemini-flash-latest (гарантированный бесплатный тариф)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
+    # 2. ИСПРАВЛЕНИЕ: Используем конкретную свежую бесплатную модель из твоего списка
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
     
     # 3. Создаем запрос
     payload = {
