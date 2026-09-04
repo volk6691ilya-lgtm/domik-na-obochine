@@ -12,7 +12,7 @@ def main():
     api_key = api_key.strip()
     
     # 2. ИСПРАВЛЕНИЕ: Используем модель, которая есть в твоем списке
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+       url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key}"
     
     # 3. Создаем запрос
     payload = {
