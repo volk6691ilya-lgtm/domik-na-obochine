@@ -162,7 +162,6 @@ def get_news_data():
                 link = entry.get('link', '')
                 time_ago = format_time_ago(entry.get('published_parsed'))
                 
-                # Экранируем спецсимволы Markdown в заголовке
                 title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
                 
                 time_prefix = f"[{time_ago}] " if time_ago else ""
@@ -174,6 +173,7 @@ def get_news_data():
         return "\n".join(headlines[:5])
     except Exception as e:
         return "• Новости: Ошибка сбора данных"
+
 # ==========================================
 # 3. ИИ-АНАЛИЗ (OPENROUTER) С УЧЕТОМ СЕССИИ
 # ==========================================
@@ -195,16 +195,16 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
         fg_emoji = ""
         fg_signal = "ПАНИКА — возможны покупки на дне"
     elif fg_value <= 49:
-        fg_emoji = "🟠"
+        fg_emoji = ""
         fg_signal = "СТРАХ — рынок осторожничает"
     elif fg_value <= 51:
-        fg_emoji = "🟡"
+        fg_emoji = ""
         fg_signal = "НЕЙТРАЛЬНО — неопределенность"
     elif fg_value <= 74:
-        fg_emoji = "🟢"
+        fg_emoji = ""
         fg_signal = "ЖАДНОСТЬ — осторожно с FOMO"
     else:
-        fg_emoji = "🔴"
+        fg_emoji = ""
         fg_signal = "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ — высокая вероятность коррекции"
     
     prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ обзор рынка для Telegram-канала.
@@ -238,7 +238,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Расшифровка: 0-24=Extreme Fear, 25-49=Fear, 50=Neutral, 51-74=Greed, 75-100=Extreme Greed
 - Ключевые движения BTC и ETH за АНАЛИЗИРУЕМЫЙ ПЕРИОД
 
-🎯 УРОВНИ BTC:
+ УРОВНИ BTC:
 - Поддержка: [из данных]
 - Сопротивление: [из данных]
 - Текущая цена: [из данных]
@@ -254,11 +254,11 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Сохрани временные метки [X ч. назад] из исходных данных
 - Влияние на рынок (1 предложение)
 
-️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
+⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит."
 
- ТОРГОВЫЕ ИДЕИ (3 совета):
-1️⃣ [Конкретное действие]: [Пояснение с процентами]
+🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
+1️ [Конкретное действие]: [Пояснение с процентами]
 2️⃣ [Конкретное действие]: [Пояснение с процентами]
 3️⃣ [Конкретное действие]: [Пояснение с процентами]
 
@@ -267,7 +267,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - 🟢 зеленый = бычий сигнал / рост
 - 🔴 красный = медвежий сигнал / падение / риск
 - 🟡 желтый = нейтрально / предупреждение / внимание
--  синий = факт / объем / нейтральная статистика
+- 🔵 синий = факт / объем / нейтральная статистика
 
 Формат каждого пункта: "[цвет] [Актив/метрика]: [значение] — [короткий вывод]"
 
@@ -277,7 +277,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Все активы из входных данных (крипта, сырьё, индексы)
 
 ⚖️ ДИСКЛЕЙМЕР:
-"⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль."
+"️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль."
 
 ВАЖНО: НЕ добавляй в конец информацию о следующем выпуске или призывы подписаться — это добавит система автоматически после твоего текста.
 
@@ -293,6 +293,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 ПРИСТУПАЙ!"""
     
     for model in models:
+        print(f"   Пробуем модель: {model}")
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}]
@@ -304,10 +305,18 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
             "X-Title": "Ember Watch System"
         }
         
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-        elif response.status_code == 429:
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=60)
+            if response.status_code == 200:
+                print(f"   ✅ Модель {model} ответила успешно!")
+                return response.json()['choices'][0]['message']['content']
+            elif response.status_code == 429:
+                print(f"   ⚠️ Модель {model} перегружена (429). Пробуем следующую...")
+                continue
+            else:
+                print(f"   ❌ Модель {model} вернула ошибку {response.status_code}")
+        except Exception as e:
+            print(f"   ❌ Ошибка при запросе к {model}: {e}")
             continue
             
     return "Ошибка: ИИ временно недоступен. Попробуйте позже."
@@ -330,12 +339,12 @@ def get_post_footer(session_info):
         next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
     
     footer = f"""
-⏰ СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
+ СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
 
 🔔 ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику. При резких изменениях, которые могут повлиять на ваши позиции, в канал придёт экстренный сигнал.
 
- Если обзор был полезен — ставь реакцию!
+👍 Если обзор был полезен — ставь реакцию!
  Подписывайся на канал, чтобы не пропустить важные сигналы."""
     
     return footer
@@ -347,7 +356,6 @@ def send_to_telegram(text):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
-    # 1. Отправляем обложку
     seed = random.randint(1, 99999)
     image_url = f"https://image.pollinations.ai/prompt/cyberpunk%20financial%20market%20data%20dark%20neon%20glowing%20charts?width=1200&height=600&nologo=true&seed={seed}"
     
@@ -362,7 +370,6 @@ def send_to_telegram(text):
     requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
     time.sleep(2)
     
-    # 2. УМНАЯ НАРЕЗКА
     max_len = 4000
     paragraphs = text.split('\n\n')
     
@@ -395,7 +402,6 @@ def send_to_telegram(text):
     if current_part:
         parts.append(current_part.strip())
     
-    # 3. Отправляем каждую часть
     total_parts = len(parts)
     
     for i, part in enumerate(parts):
@@ -443,14 +449,18 @@ def main():
     finance = get_finance_data()
     news = get_news_data()
     
-    print("🧠 ИИ-анализ...")
-    analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
+    print("🧠 ИИ-анализ (это может занять 30-60 секунд)...")
+    try:
+        analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
+    except Exception as e:
+        print(f"❌ Ошибка ИИ-анализа: {e}")
+        analysis = "Ошибка генерации анализа. Попробуйте позже."
     
-    print("📎 Добавление футера...")
+    print(" Добавление футера...")
     footer = get_post_footer(session_info)
     full_text = analysis + "\n\n" + footer
     
-    print(f"📏 Длина текста: {len(full_text)} символов")
+    print(f" Длина текста: {len(full_text)} символов")
     
     print("📤 Публикация...")
     send_to_telegram(full_text)
