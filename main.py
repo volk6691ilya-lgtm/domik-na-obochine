@@ -215,7 +215,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 
 РЕАЛЬНЫЕ ДАННЫЕ:
 [ИНДЕКС СТРАХА/ЖАДНОСТИ]: {fg_value}/100 ({fg_class}) → {fg_emoji} {fg_signal}
-[ДОМИНАЦИЯ BTC]: {btc_dominance:.1f}%
+[ДОМИНАЦИЯ BTC]: {btc_dom:.1f}%
 [ОБЩАЯ КАПИТАЛИЗАЦИЯ]: ${total_mcap:.0f}B
 [КРИПТА С ОБЪЕМАМИ]: {crypto}
 [УРОВНИ BTC]: {support_resistance}
