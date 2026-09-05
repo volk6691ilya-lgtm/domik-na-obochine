@@ -2,9 +2,9 @@ import os
 import requests
 
 def main():
-    print("🧠 Тест OpenRouter API (Бесплатный и стабильный)...")
+    print("🧠 Тест OpenRouter API (Модель: Gemma 4 31B Free)...")
     
-    # 1. Получаем новый ключ
+    # 1. Получаем ключ
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise Exception("❌ Ключ OPENROUTER_API_KEY не найден в Secrets!")
@@ -14,11 +14,10 @@ def main():
     # 2. URL OpenRouter API
     url = "https://openrouter.ai/api/v1/chat/completions"
     
-    # 3. Выбираем мощную бесплатную модель (Gemini 2.0 Flash через OpenRouter)
-    # Суффикс :free гарантирует, что мы используем бесплатный тариф
-    model = "google/gemini-2.0-flash-exp:free"
+    # 3. ИСПРАВЛЕНИЕ: Используем модель, которая ТОЧНО есть в твоем списке бесплатных
+    model = "google/gemma-4-31b-it:free"
     
-    # 4. Формируем запрос в формате OpenAI (стандарт для OpenRouter)
+    # 4. Формируем запрос
     payload = {
         "model": model,
         "messages": [
