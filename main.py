@@ -103,7 +103,7 @@ def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
     today = datetime.now().strftime("%d.%m.%Y")
     fg_value, fg_class = fear_greed
     
-    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ обзор рынка для Telegram-канала.
+    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ, ПОДРОБНЫЙ обзор рынка для Telegram-канала.
 
 ТЕКУЩАЯ ДАТА: {today} (используй ИМЕННО эту дату!)
 
@@ -144,8 +144,8 @@ def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
 
 🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
-1️⃣ [Конкретное действие]: [Пояснение с процентами]
-2️⃣ [Конкретное действие]: [Пояснение с процентами]
+1️ [Конкретное действие]: [Пояснение с процентами]
+2️ [Конкретное действие]: [Пояснение с процентами]
 3️⃣ [Конкретное действие]: [Пояснение с процентами]
 
 ⚡ QUICK STATS:
@@ -159,8 +159,9 @@ def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
 - Эмодзи: умеренно, только для структуры
 - Сленг с расшифровками в скобках
 - Тон: ПРОФЕССИОНАЛЬНЫЙ, ОСТОРОЖНЫЙ
-- ОБЪЕМ: СТРОГО до 3800 символов (это критично!)
+- ОБЪЕМ: Пиши ПОДРОБНО, но БЕЗ ВОДЫ. Система автоматически разобьет на части если нужно.
 - НЕ используй "---" между блоками
+- Разбивай текст на абзацы (двойной перенос строки между блоками)
 
 ПРИСТУПАЙ!"""
     
@@ -185,7 +186,7 @@ def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
     return "Ошибка: ИИ временно недоступен. Попробуйте позже."
 
 # ==========================================
-# 3. ОТПРАВКА В TELEGRAM С НАРЕЗКОЙ
+# 3. УМНАЯ ОТПРАВКА В TELEGRAM С НАРЕЗКОЙ
 # ==========================================
 def send_to_telegram(text):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -206,46 +207,74 @@ def send_to_telegram(text):
     requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
     time.sleep(2)
     
-    # 2. Нарезаем текст на части по 3500 символов
-    max_len = 3500
+    # 2. УМНАЯ НАРЕЗКА: разбиваем по абзацам
+    max_len = 4000  # Оставляем запас до 4096
+    paragraphs = text.split('\n\n')  # Разбиваем по двойным переносам
+    
     parts = []
+    current_part = ""
     
-    if len(text) <= max_len:
-        parts.append(text)
-    else:
-        # Разбиваем по абзацам (двойной перенос строки)
-        paragraphs = text.split('\n\n')
-        current_part = ""
-        
-        for para in paragraphs:
-            if len(current_part) + len(para) + 2 <= max_len:
-                current_part += para + "\n\n"
-            else:
-                if current_part:
-                    parts.append(current_part.strip())
-                current_part = para + "\n\n"
-        
-        if current_part:
-            parts.append(current_part.strip())
+    for para in paragraphs:
+        # Если абзац сам по себе больше лимита — режем его по предложениям
+        if len(para) > max_len:
+            # Сначала сохраняем текущую часть если она есть
+            if current_part:
+                parts.append(current_part.strip())
+                current_part = ""
+            
+            # Режем большой абзац по предложениям
+            sentences = para.split('. ')
+            temp_part = ""
+            for sentence in sentences:
+                if len(temp_part) + len(sentence) + 2 <= max_len:
+                    temp_part += sentence + ". "
+                else:
+                    if temp_part:
+                        parts.append(temp_part.strip())
+                    temp_part = sentence + ". "
+            if temp_part:
+                current_part = temp_part
+        # Если абзац помещается в текущую часть
+        elif len(current_part) + len(para) + 2 <= max_len:
+            current_part += para + "\n\n"
+        # Если не помещается — сохраняем текущую и начинаем новую
+        else:
+            if current_part:
+                parts.append(current_part.strip())
+            current_part = para + "\n\n"
     
-    # 3. Отправляем каждую часть с паузой
+    # Добавляем последнюю часть
+    if current_part:
+        parts.append(current_part.strip())
+    
+    # 3. Отправляем каждую часть с индикатором "Часть X/Y"
+    total_parts = len(parts)
+    
     for i, part in enumerate(parts):
         if i > 0:
             time.sleep(3)  # Пауза между частями
         
-        # Если часть всё ещё слишком длинная, режем жестко
-        if len(part) > 4000:
-            part = part[:3900] + "\n\n...(продолжение в следующем сообщении)"
+        # Добавляем индикатор части если их больше 1
+        if total_parts > 1:
+            header = f"📄 **ЧАСТЬ {i+1}/{total_parts}**\n\n"
+            footer = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
+            part_with_indicator = header + part + footer
+        else:
+            part_with_indicator = part
+        
+        # Финальная проверка длины
+        if len(part_with_indicator) > 4090:
+            part_with_indicator = part_with_indicator[:4080] + "\n\n_...текст обрезан из-за ограничения длины_"
         
         text_payload = {
             "chat_id": channel_id,
-            "text": part,
+            "text": part_with_indicator,
             "parse_mode": "Markdown"
         }
         response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=text_payload, timeout=15)
         
         if response.status_code == 200:
-            print(f"✅ Часть {i+1}/{len(parts)} отправлена!")
+            print(f"✅ Часть {i+1}/{total_parts} отправлена! (длина: {len(part_with_indicator)})")
         else:
             print(f"❌ Ошибка части {i+1}: {response.text}")
 
@@ -253,9 +282,9 @@ def send_to_telegram(text):
 # 4. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print(" Запуск Пожарного Шпиона v22.0 PROFESSIONAL...")
+    print(" Запуск Пожарного Шпиона v22.1 PROFESSIONAL+...")
     
-    print("📡 Сбор данных...")
+    print(" Сбор данных...")
     fear_greed = get_fear_greed_index()
     crypto = get_crypto_data()
     support_resistance = get_support_resistance()
