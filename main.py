@@ -6,10 +6,40 @@ import random
 import yfinance as yf
 import feedparser
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # ==========================================
-# 1. СБОР РЕАЛЬНЫХ ДАННЫХ (7 ВЕТВЕЙ)
+# 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА (УТРО/ВЕЧЕР)
+# ==========================================
+def get_session_info():
+    """Определяем тип выпуска и временной диапазон анализа"""
+    msk_tz = timezone(timedelta(hours=3))
+    now_msk = datetime.now(msk_tz)
+    current_hour = now_msk.hour
+    
+    if current_hour < 15:  # Утренний выпуск (до 15:00 МСК)
+        session_type = "morning"
+        session_name = "УТРЕННИЙ"
+        period_start = now_msk.replace(hour=21, minute=0, second=0) - timedelta(days=1)
+        period_end = now_msk.replace(hour=9, minute=0, second=0)
+        period_text = f"с 21:00 {period_start.strftime('%d.%m')} по 09:00 {now_msk.strftime('%d.%m.%Y')} (ночная сессия)"
+    else:  # Вечерний выпуск
+        session_type = "evening"
+        session_name = "ВЕЧЕРНИЙ"
+        period_start = now_msk.replace(hour=9, minute=0, second=0)
+        period_end = now_msk.replace(hour=21, minute=0, second=0)
+        period_text = f"с 09:00 по 21:00 {now_msk.strftime('%d.%m.%Y')} (дневная сессия)"
+    
+    return {
+        "type": session_type,
+        "name": session_name,
+        "period": period_text,
+        "date": now_msk.strftime("%d.%m.%Y"),
+        "time": now_msk.strftime("%H:%M")
+    }
+
+# ==========================================
+# 2. СБОР РЕАЛЬНЫХ ДАННЫХ (8 ВЕТВЕЙ)
 # ==========================================
 
 def get_fear_greed_index():
@@ -22,6 +52,23 @@ def get_fear_greed_index():
         return int(value), classification
     except Exception as e:
         return None, f"Ошибка: {str(e)[:20]}"
+
+def get_global_data():
+    """Получаем доминацию BTC и общую капитализацию"""
+    try:
+        url = "https://api.coingecko.com/api/v3/global"
+        response = requests.get(url, timeout=10).json()
+        data = response['data']
+        btc_dominance = data.get('market_cap_percentage', {}).get('btc', 0)
+        total_market_cap = data.get('total_market_cap', {}).get('usd', 0)
+        total_volume = data.get('total_volume', {}).get('usd', 0)
+        return {
+            'btc_dominance': btc_dominance,
+            'total_market_cap': total_market_cap / 1_000_000_000,  # в млрд
+            'total_volume': total_volume / 1_000_000_000
+        }
+    except Exception as e:
+        return {'btc_dominance': 0, 'total_market_cap': 0, 'total_volume': 0}
 
 def get_crypto_data():
     """Крипта с объемами торгов"""
@@ -71,8 +118,39 @@ def get_finance_data():
     except Exception as e:
         return f"• Рынки: Ошибка ({str(e)[:30]})"
 
+def format_time_ago(published_time):
+    """Форматирует время публикации новости относительно текущего момента"""
+    try:
+        msk_tz = timezone(timedelta(hours=3))
+        now = datetime.now(msk_tz)
+        
+        # published_time может быть struct_time или datetime
+        if hasattr(published_time, 'tm_year'):
+            pub_dt = datetime(*published_time[:6], tzinfo=msk_tz)
+        elif isinstance(published_time, datetime):
+            pub_dt = published_time
+        else:
+            return ""
+        
+        # Если время без tzinfo, добавляем UTC и конвертируем
+        if pub_dt.tzinfo is None:
+            pub_dt = pub_dt.replace(tzinfo=timezone.utc).astimezone(msk_tz)
+        
+        diff = now - pub_dt
+        hours = int(diff.total_seconds() / 3600)
+        
+        if hours < 1:
+            return "только что"
+        elif hours < 24:
+            return f"{hours} ч. назад"
+        else:
+            days = hours // 24
+            return f"{days} дн. назад"
+    except:
+        return ""
+
 def get_news_data():
-    """Новости из RSS"""
+    """Новости из RSS с временными метками"""
     try:
         feeds = [
             "http://feeds.reuters.com/reuters/businessNews",
@@ -82,15 +160,20 @@ def get_news_data():
         for feed_url in feeds:
             feed = feedparser.parse(feed_url)
             for entry in feed.entries[:3]:
-                headlines.append(f"• {entry.title}")
+                title = entry.title
+                time_ago = format_time_ago(entry.get('published_parsed'))
+                if time_ago:
+                    headlines.append(f"• [{time_ago}] {title}")
+                else:
+                    headlines.append(f"• {title}")
         return "\n".join(headlines[:5])
     except Exception as e:
         return "• Новости: Ошибка сбора данных"
 
 # ==========================================
-# 2. ИИ-АНАЛИЗ (OPENROUTER)
+# 3. ИИ-АНАЛИЗ (OPENROUTER) С УЧЕТОМ СЕССИИ
 # ==========================================
-def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
+def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news):
     api_key = os.environ.get("OPENROUTER_API_KEY")
     url = "https://openrouter.ai/api/v1/chat/completions"
     
@@ -100,30 +183,57 @@ def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
         "inclusionai/ling-3.0-flash-fin:free"
     ]
     
-    today = datetime.now().strftime("%d.%m.%Y")
     fg_value, fg_class = fear_greed
+    btc_dom = global_data['btc_dominance']
+    total_mcap = global_data['total_market_cap']
     
-    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ, ПОДРОБНЫЙ обзор рынка для Telegram-канала.
+    # Определяем цвет для Fear & Greed
+    if fg_value <= 24:
+        fg_emoji = "🔴"
+        fg_signal = "ПАНИКА — возможны покупки на дне"
+    elif fg_value <= 49:
+        fg_emoji = ""
+        fg_signal = "СТРАХ — рынок осторожничает"
+    elif fg_value <= 51:
+        fg_emoji = "🟡"
+        fg_signal = "НЕЙТРАЛЬНО — неопределенность"
+    elif fg_value <= 74:
+        fg_emoji = "🟢"
+        fg_signal = "ЖАДНОСТЬ — осторожно с FOMO"
+    else:
+        fg_emoji = "🔴"
+        fg_signal = "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ — высокая вероятность коррекции"
+    
+    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ обзор рынка для Telegram-канала.
 
-ТЕКУЩАЯ ДАТА: {today} (используй ИМЕННО эту дату!)
+КОНТЕКСТ ВЫПУСКА:
+- Тип: {session_info['name']} выпуск
+- Дата: {session_info['date']}
+- Время публикации: {session_info['time']} МСК
+- АНАЛИЗИРУЕМЫЙ ПЕРИОД: {session_info['period']}
+- ВАЖНО: Все выводы делай ИМЕННО за этот период, не за последние 24 часа!
 
 РЕАЛЬНЫЕ ДАННЫЕ:
-[ИНДЕКС СТРАХА/ЖАДНОСТИ]: {fg_value}/100 ({fg_class})
+[ИНДЕКС СТРАХА/ЖАДНОСТИ]: {fg_value}/100 ({fg_class}) → {fg_emoji} {fg_signal}
+[ДОМИНАЦИЯ BTC]: {btc_dominance:.1f}%
+[ОБЩАЯ КАПИТАЛИЗАЦИЯ]: ${total_mcap:.0f}B
 [КРИПТА С ОБЪЕМАМИ]: {crypto}
 [УРОВНИ BTC]: {support_resistance}
 [ТРАДИЦИОННЫЕ РЫНКИ]: {finance}
-[НОВОСТИ]: {news}
+[НОВОСТИ С ВРЕМЕНЕМ]: {news}
 
 СТРОГАЯ СТРУКТУРА (НЕ ПРОПУСКАЙ НИ ОДИН БЛОК):
 
-🔥 ПОЖАРНЫЙ ШПИОН: ОБЗОР РЫНКА — {today}
+🔥 ПОЖАРНЫЙ ШПИОН: {session_info['name']} ОБЗОР — {session_info['date']}
+
+📊 ПЕРИОД АНАЛИЗА: {session_info['period']}
 
 ⚠️ Сначала риски, потом возможности!
 
 🌍 РЫНОЧНЫЙ СРЕЗ:
-- Индекс страха/жадности: {fg_value}/100 ({fg_class})
+- {fg_emoji} Индекс страха/жадности: {fg_value}/100 ({fg_class})
 - Расшифровка: 0-24=Extreme Fear, 25-49=Fear, 50=Neutral, 51-74=Greed, 75-100=Extreme Greed
-- Ключевые движения BTC и ETH с объемами
+- Ключевые движения BTC и ETH за АНАЛИЗИРУЕМЫЙ ПЕРИОД
 
 🎯 УРОВНИ BTC:
 - Поддержка: [из данных]
@@ -131,37 +241,54 @@ def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
 - Текущая цена: [из данных]
 - Вывод: близко к поддержке/сопротивлению/между ними
 
-🐋 ДЕЙСТВИЯ КИТОВ:
-- Куда перетекает капитал
+ ДЕЙСТВИЯ КИТОВ:
+- Куда перетекает капитал за этот период
 - Институциональная активность
 
-📰 ГЛАВНЫЕ НОВОСТИ:
-- 2-3 новости из блока [НОВОСТИ]
+📰 ГЛАВНЫЕ НОВОСТИ (с временными метками!):
+- 2-3 новости из блока [НОВОСТИ С ВРЕМЕНЕМ]
+- Сохрани временные метки [X ч. назад] из исходных данных
 - Влияние на рынок (1 предложение)
-- Если новостей нет: "📰 Новостной фон: Спокойный"
 
-⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ (ОБЯЗАТЕЛЬНО!):
-"Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
+⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
+"Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит."
 
 🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
-1️ [Конкретное действие]: [Пояснение с процентами]
-2️ [Конкретное действие]: [Пояснение с процентами]
+1️⃣ [Конкретное действие]: [Пояснение с процентами]
+2️⃣ [Конкретное действие]: [Пояснение с процентами]
 3️⃣ [Конкретное действие]: [Пояснение с процентами]
 
-⚡ QUICK STATS:
-- 3-4 коротких факта с эмодзи
+⚡ QUICK STATS (с ЦВЕТОВОЙ КОДИРОВКОЙ):
+Используй эмодзи-цвета для сигналов:
+- 🟢 зеленый = бычий сигнал / рост
+-  красный = медвежий сигнал / падение / риск
+- 🟡 желтый = нейтрально / предупреждение / внимание
+-  синий = факт / объем / нейтральная статистика
+
+Формат каждого пункта: "[цвет] [Актив/метрика]: [значение] — [короткий вывод]"
+
+Примеры:
+- 🟢 BTC: $79,704 (+0.59%) — уверенный рост
+-  S&P 500: -0.41% — риск-офф в акциях
+- 🟡 Greed 73/100 — осторожно с FOMO
+- 🔵 Объем BTC: $18.98B — высокая ликвидность
+
+ОБЯЗАТЕЛЬНО включи в Quick Stats:
+- Доминацию BTC с комментарием (растет/падает — что это значит)
+- Индекс страха/жадности с цветовой кодировкой
 
 ️ ДИСКЛЕЙМЕР:
 "⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль."
 
 ПРАВИЛА:
 - **Жирный шрифт** для цифр ($79,667) и активов (BTC, ETH)
-- Эмодзи: умеренно, только для структуры
+- Эмодзи: умеренно, только для структуры и цветовой кодировки
 - Сленг с расшифровками в скобках
 - Тон: ПРОФЕССИОНАЛЬНЫЙ, ОСТОРОЖНЫЙ
-- ОБЪЕМ: Пиши ПОДРОБНО, но БЕЗ ВОДЫ. Система автоматически разобьет на части если нужно.
+- ОБЪЕМ: Пиши ПОДРОБНО, но БЕЗ ВОДЫ. Система автоматически разобьет на части.
 - НЕ используй "---" между блоками
 - Разбивай текст на абзацы (двойной перенос строки между блоками)
+- Временные метки новостей сохраняй как есть [X ч. назад]
 
 ПРИСТУПАЙ!"""
     
@@ -186,7 +313,7 @@ def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
     return "Ошибка: ИИ временно недоступен. Попробуйте позже."
 
 # ==========================================
-# 3. УМНАЯ ОТПРАВКА В TELEGRAM С НАРЕЗКОЙ
+# 4. УМНАЯ ОТПРАВКА В TELEGRAM С НАРЕЗКОЙ
 # ==========================================
 def send_to_telegram(text):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -196,7 +323,7 @@ def send_to_telegram(text):
     seed = random.randint(1, 99999)
     image_url = f"https://image.pollinations.ai/prompt/cyberpunk%20financial%20market%20data%20dark%20neon%20glowing%20charts?width=1200&height=600&nologo=true&seed={seed}"
     
-    caption = "🔥 ПОЖАРНЫЙ ШПИОН НА СВЯЗИ\n\nСистема завершила анализ 7 ветвей рынка. Полный разбор ниже 👇"
+    caption = "🔥 ПОЖАРНЫЙ ШПИОН НА СВЯЗИ\n\nСистема завершила анализ 8 ветвей рынка. Полный разбор ниже 👇"
     
     photo_payload = {
         "chat_id": channel_id,
@@ -208,21 +335,17 @@ def send_to_telegram(text):
     time.sleep(2)
     
     # 2. УМНАЯ НАРЕЗКА: разбиваем по абзацам
-    max_len = 4000  # Оставляем запас до 4096
-    paragraphs = text.split('\n\n')  # Разбиваем по двойным переносам
+    max_len = 4000
+    paragraphs = text.split('\n\n')
     
     parts = []
     current_part = ""
     
     for para in paragraphs:
-        # Если абзац сам по себе больше лимита — режем его по предложениям
         if len(para) > max_len:
-            # Сначала сохраняем текущую часть если она есть
             if current_part:
                 parts.append(current_part.strip())
                 current_part = ""
-            
-            # Режем большой абзац по предложениям
             sentences = para.split('. ')
             temp_part = ""
             for sentence in sentences:
@@ -234,35 +357,30 @@ def send_to_telegram(text):
                     temp_part = sentence + ". "
             if temp_part:
                 current_part = temp_part
-        # Если абзац помещается в текущую часть
         elif len(current_part) + len(para) + 2 <= max_len:
             current_part += para + "\n\n"
-        # Если не помещается — сохраняем текущую и начинаем новую
         else:
             if current_part:
                 parts.append(current_part.strip())
             current_part = para + "\n\n"
     
-    # Добавляем последнюю часть
     if current_part:
         parts.append(current_part.strip())
     
-    # 3. Отправляем каждую часть с индикатором "Часть X/Y"
+    # 3. Отправляем каждую часть с индикатором
     total_parts = len(parts)
     
     for i, part in enumerate(parts):
         if i > 0:
-            time.sleep(3)  # Пауза между частями
+            time.sleep(3)
         
-        # Добавляем индикатор части если их больше 1
         if total_parts > 1:
-            header = f"📄 **ЧАСТЬ {i+1}/{total_parts}**\n\n"
+            header = f" **ЧАСТЬ {i+1}/{total_parts}**\n\n"
             footer = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
             part_with_indicator = header + part + footer
         else:
             part_with_indicator = part
         
-        # Финальная проверка длины
         if len(part_with_indicator) > 4090:
             part_with_indicator = part_with_indicator[:4080] + "\n\n_...текст обрезан из-за ограничения длины_"
         
@@ -279,20 +397,26 @@ def send_to_telegram(text):
             print(f"❌ Ошибка части {i+1}: {response.text}")
 
 # ==========================================
-# 4. ГЛАВНЫЙ ЗАПУСК
+# 5. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print(" Запуск Пожарного Шпиона v22.1 PROFESSIONAL+...")
+    print(" Запуск Пожарного Шпиона v23.0 SESSION-AWARE...")
     
-    print(" Сбор данных...")
+    print("📡 Определение типа выпуска...")
+    session_info = get_session_info()
+    print(f"   Тип: {session_info['name']} выпуск")
+    print(f"   Период: {session_info['period']}")
+    
+    print("📡 Сбор данных...")
     fear_greed = get_fear_greed_index()
+    global_data = get_global_data()
     crypto = get_crypto_data()
     support_resistance = get_support_resistance()
     finance = get_finance_data()
     news = get_news_data()
     
     print("🧠 ИИ-анализ...")
-    analysis = get_ai_analysis(fear_greed, crypto, support_resistance, finance, news)
+    analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
     
     print(f"📏 Длина текста: {len(analysis)} символов")
     
