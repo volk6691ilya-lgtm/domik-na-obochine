@@ -64,7 +64,7 @@ def get_global_data():
         total_volume = data.get('total_volume', {}).get('usd', 0)
         return {
             'btc_dominance': btc_dominance,
-            'total_market_cap': total_market_cap / 1_000_000_000,  # в млрд
+            'total_market_cap': total_market_cap / 1_000_000_000,
             'total_volume': total_volume / 1_000_000_000
         }
     except Exception as e:
@@ -124,7 +124,6 @@ def format_time_ago(published_time):
         msk_tz = timezone(timedelta(hours=3))
         now = datetime.now(msk_tz)
         
-        # published_time может быть struct_time или datetime
         if hasattr(published_time, 'tm_year'):
             pub_dt = datetime(*published_time[:6], tzinfo=msk_tz)
         elif isinstance(published_time, datetime):
@@ -132,7 +131,6 @@ def format_time_ago(published_time):
         else:
             return ""
         
-        # Если время без tzinfo, добавляем UTC и конвертируем
         if pub_dt.tzinfo is None:
             pub_dt = pub_dt.replace(tzinfo=timezone.utc).astimezone(msk_tz)
         
@@ -150,7 +148,7 @@ def format_time_ago(published_time):
         return ""
 
 def get_news_data():
-    """Новости из RSS с временными метками"""
+    """Новости из RSS с временными метками и КЛИКАБЕЛЬНЫМИ ссылками"""
     try:
         feeds = [
             "http://feeds.reuters.com/reuters/businessNews",
@@ -161,15 +159,21 @@ def get_news_data():
             feed = feedparser.parse(feed_url)
             for entry in feed.entries[:3]:
                 title = entry.title
+                link = entry.get('link', '')
                 time_ago = format_time_ago(entry.get('published_parsed'))
-                if time_ago:
-                    headlines.append(f"• [{time_ago}] {title}")
+                
+                # Экранируем спецсимволы Markdown в заголовке
+                title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
+                
+                time_prefix = f"[{time_ago}] " if time_ago else ""
+                
+                if link:
+                    headlines.append(f"• {time_prefix}[{title_safe}]({link})")
                 else:
-                    headlines.append(f"• {title}")
+                    headlines.append(f"• {time_prefix}{title_safe}")
         return "\n".join(headlines[:5])
     except Exception as e:
         return "• Новости: Ошибка сбора данных"
-
 # ==========================================
 # 3. ИИ-АНАЛИЗ (OPENROUTER) С УЧЕТОМ СЕССИИ
 # ==========================================
@@ -187,12 +191,11 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     btc_dom = global_data['btc_dominance']
     total_mcap = global_data['total_market_cap']
     
-    # Определяем цвет для Fear & Greed
     if fg_value <= 24:
-        fg_emoji = "🔴"
+        fg_emoji = ""
         fg_signal = "ПАНИКА — возможны покупки на дне"
     elif fg_value <= 49:
-        fg_emoji = ""
+        fg_emoji = "🟠"
         fg_signal = "СТРАХ — рынок осторожничает"
     elif fg_value <= 51:
         fg_emoji = "🟡"
@@ -211,7 +214,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Дата: {session_info['date']}
 - Время публикации: {session_info['time']} МСК
 - АНАЛИЗИРУЕМЫЙ ПЕРИОД: {session_info['period']}
-- ВАЖНО: Все выводы делай ИМЕННО за этот период, не за последние 24 часа!
+- ВАЖНО: Все выводы делай ИМЕННО за этот период!
 
 РЕАЛЬНЫЕ ДАННЫЕ:
 [ИНДЕКС СТРАХА/ЖАДНОСТИ]: {fg_value}/100 ({fg_class}) → {fg_emoji} {fg_signal}
@@ -220,7 +223,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [КРИПТА С ОБЪЕМАМИ]: {crypto}
 [УРОВНИ BTC]: {support_resistance}
 [ТРАДИЦИОННЫЕ РЫНКИ]: {finance}
-[НОВОСТИ С ВРЕМЕНЕМ]: {news}
+[НОВОСТИ С ВРЕМЕНЕМ И ССЫЛКАМИ]: {news}
 
 СТРОГАЯ СТРУКТУРА (НЕ ПРОПУСКАЙ НИ ОДИН БЛОК):
 
@@ -241,19 +244,20 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Текущая цена: [из данных]
 - Вывод: близко к поддержке/сопротивлению/между ними
 
- ДЕЙСТВИЯ КИТОВ:
+🐋 ДЕЙСТВИЯ КИТОВ:
 - Куда перетекает капитал за этот период
 - Институциональная активность
 
-📰 ГЛАВНЫЕ НОВОСТИ (с временными метками!):
-- 2-3 новости из блока [НОВОСТИ С ВРЕМЕНЕМ]
+📰 ГЛАВНЫЕ НОВОСТИ:
+- 2-3 новости из блока [НОВОСТИ С ВРЕМЕНЕМ И ССЫЛКАМИ]
+- СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ В ФОРМАТЕ [текст](url) — НЕ УДАЛЯЙ ИХ!
 - Сохрани временные метки [X ч. назад] из исходных данных
 - Влияние на рынок (1 предложение)
 
-⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
+️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит."
 
-🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
+ ТОРГОВЫЕ ИДЕИ (3 совета):
 1️⃣ [Конкретное действие]: [Пояснение с процентами]
 2️⃣ [Конкретное действие]: [Пояснение с процентами]
 3️⃣ [Конкретное действие]: [Пояснение с процентами]
@@ -261,24 +265,21 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 ⚡ QUICK STATS (с ЦВЕТОВОЙ КОДИРОВКОЙ):
 Используй эмодзи-цвета для сигналов:
 - 🟢 зеленый = бычий сигнал / рост
--  красный = медвежий сигнал / падение / риск
+- 🔴 красный = медвежий сигнал / падение / риск
 - 🟡 желтый = нейтрально / предупреждение / внимание
 -  синий = факт / объем / нейтральная статистика
 
 Формат каждого пункта: "[цвет] [Актив/метрика]: [значение] — [короткий вывод]"
 
-Примеры:
-- 🟢 BTC: $79,704 (+0.59%) — уверенный рост
--  S&P 500: -0.41% — риск-офф в акциях
-- 🟡 Greed 73/100 — осторожно с FOMO
-- 🔵 Объем BTC: $18.98B — высокая ликвидность
-
 ОБЯЗАТЕЛЬНО включи в Quick Stats:
-- Доминацию BTC с комментарием (растет/падает — что это значит)
+- Доминацию BTC с комментарием
 - Индекс страха/жадности с цветовой кодировкой
+- Все активы из входных данных (крипта, сырьё, индексы)
 
-️ ДИСКЛЕЙМЕР:
+⚖️ ДИСКЛЕЙМЕР:
 "⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль."
+
+ВАЖНО: НЕ добавляй в конец информацию о следующем выпуске или призывы подписаться — это добавит система автоматически после твоего текста.
 
 ПРАВИЛА:
 - **Жирный шрифт** для цифр ($79,667) и активов (BTC, ETH)
@@ -288,7 +289,6 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - ОБЪЕМ: Пиши ПОДРОБНО, но БЕЗ ВОДЫ. Система автоматически разобьет на части.
 - НЕ используй "---" между блоками
 - Разбивай текст на абзацы (двойной перенос строки между блоками)
-- Временные метки новостей сохраняй как есть [X ч. назад]
 
 ПРИСТУПАЙ!"""
     
@@ -313,7 +313,35 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     return "Ошибка: ИИ временно недоступен. Попробуйте позже."
 
 # ==========================================
-# 4. УМНАЯ ОТПРАВКА В TELEGRAM С НАРЕЗКОЙ
+# 4. ФУТЕР ПОСТА (СЛЕДУЮЩИЙ ВЫПУСК + ПОЖАРНЫЙ ШПИОН)
+# ==========================================
+def get_post_footer(session_info):
+    """Генерирует информационный футер поста"""
+    msk_tz = timezone(timedelta(hours=3))
+    now_msk = datetime.now(msk_tz)
+    
+    if session_info['type'] == 'morning':
+        next_time = "21:00"
+        next_type = "вечерний"
+        next_date = now_msk.strftime("%d.%m.%Y")
+    else:
+        next_time = "09:00"
+        next_type = "утренний"
+        next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
+    
+    footer = f"""
+⏰ СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
+
+🔔 ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
+Система автоматически мониторит рынки и геополитику. При резких изменениях, которые могут повлиять на ваши позиции, в канал придёт экстренный сигнал.
+
+ Если обзор был полезен — ставь реакцию!
+ Подписывайся на канал, чтобы не пропустить важные сигналы."""
+    
+    return footer
+
+# ==========================================
+# 5. УМНАЯ ОТПРАВКА В TELEGRAM С НАРЕЗКОЙ
 # ==========================================
 def send_to_telegram(text):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -334,7 +362,7 @@ def send_to_telegram(text):
     requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
     time.sleep(2)
     
-    # 2. УМНАЯ НАРЕЗКА: разбиваем по абзацам
+    # 2. УМНАЯ НАРЕЗКА
     max_len = 4000
     paragraphs = text.split('\n\n')
     
@@ -367,7 +395,7 @@ def send_to_telegram(text):
     if current_part:
         parts.append(current_part.strip())
     
-    # 3. Отправляем каждую часть с индикатором
+    # 3. Отправляем каждую часть
     total_parts = len(parts)
     
     for i, part in enumerate(parts):
@@ -375,7 +403,7 @@ def send_to_telegram(text):
             time.sleep(3)
         
         if total_parts > 1:
-            header = f" **ЧАСТЬ {i+1}/{total_parts}**\n\n"
+            header = f"📄 **ЧАСТЬ {i+1}/{total_parts}**\n\n"
             footer = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
             part_with_indicator = header + part + footer
         else:
@@ -397,10 +425,10 @@ def send_to_telegram(text):
             print(f"❌ Ошибка части {i+1}: {response.text}")
 
 # ==========================================
-# 5. ГЛАВНЫЙ ЗАПУСК
+# 6. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print(" Запуск Пожарного Шпиона v23.0 SESSION-AWARE...")
+    print("🔥 Запуск Пожарного Шпиона v24.0...")
     
     print("📡 Определение типа выпуска...")
     session_info = get_session_info()
@@ -418,10 +446,14 @@ def main():
     print("🧠 ИИ-анализ...")
     analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
     
-    print(f"📏 Длина текста: {len(analysis)} символов")
+    print("📎 Добавление футера...")
+    footer = get_post_footer(session_info)
+    full_text = analysis + "\n\n" + footer
+    
+    print(f"📏 Длина текста: {len(full_text)} символов")
     
     print("📤 Публикация...")
-    send_to_telegram(analysis)
+    send_to_telegram(full_text)
     print("✅ Миссия выполнена.")
 
 if __name__ == "__main__":
