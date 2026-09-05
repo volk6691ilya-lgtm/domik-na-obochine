@@ -2,47 +2,54 @@ import os
 import requests
 
 def main():
-    print("🧠 Тест Google Gemini API (модель 2.5 Flash Lite - максимальная стабильность)...")
+    print("🧠 Тест OpenRouter API (Бесплатный и стабильный)...")
     
-    # 1. Получаем и очищаем ключ
-    api_key = os.environ.get("GEMINI_API_KEY")
+    # 1. Получаем новый ключ
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        raise Exception("❌ Ключ Gemini не найден в Secrets GitHub!")
+        raise Exception("❌ Ключ OPENROUTER_API_KEY не найден в Secrets!")
     
     api_key = api_key.strip()
     
-    # 2. ИСПРАВЛЕНИЕ: Используем Lite-версию, которая не перегружается
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
+    # 2. URL OpenRouter API
+    url = "https://openrouter.ai/api/v1/chat/completions"
     
-    # 3. Создаем запрос
+    # 3. Выбираем мощную бесплатную модель (Gemini 2.0 Flash через OpenRouter)
+    # Суффикс :free гарантирует, что мы используем бесплатный тариф
+    model = "google/gemini-2.0-flash-exp:free"
+    
+    # 4. Формируем запрос в формате OpenAI (стандарт для OpenRouter)
     payload = {
-        "contents": [
+        "model": model,
+        "messages": [
             {
-                "parts": [
-                    {"text": "Кратко опиши, что такое Биткоин, в одном предложении, как финансовый аналитик."}
-                ]
+                "role": "user",
+                "content": "Кратко опиши, что такое Биткоин, в одном предложении, как финансовый аналитик."
             }
         ]
     }
     
     headers = {
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/volk6691ilya-lgtm/ember-watch",
+        "X-Title": "Ember Watch System"
     }
     
-    print("📤 Отправка запроса в Gemini...")
+    print(f"📤 Отправка запроса в модель: {model}")
     
-    # 4. Отправляем запрос
+    # 5. Отправляем запрос
     response = requests.post(url, json=payload, headers=headers, timeout=15)
     
-    # 5. Обрабатываем ответ
+    # 6. Обрабатываем ответ
     if response.status_code == 200:
         data = response.json()
-        text = data['candidates'][0]['content']['parts'][0]['text']
-        print(f"✅ УСПЕХ! Ответ от Gemini:\n{text}")
+        text = data['choices'][0]['message']['content']
+        print(f"✅ УСПЕХ! Ответ от ИИ:\n{text}")
     else:
         print(f"❌ ОШИБКА API! Код: {response.status_code}")
         print(f"Детали: {response.text}")
-        raise Exception("Не удалось получить ответ от Gemini")
+        raise Exception("Не удалось получить ответ от ИИ")
 
 if __name__ == "__main__":
     main()
