@@ -1,10 +1,13 @@
-name: Test Gemini API
+name: Fire Spy Main Run
 
 on:
-  workflow_dispatch:
+  schedule:
+    # Запуск в 06:00 UTC (9:00 МСК) и 18:00 UTC (21:00 МСК) каждый день
+    - cron: '0 6,18 * * *'
+  workflow_dispatch: # Возможность ручного запуска для тестов
 
 jobs:
-  test-gemini:
+  run-spy:
     runs-on: ubuntu-latest
     
     steps:
@@ -21,7 +24,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
-      - name: Test OpenRouter
+      - name: Run Fire Spy
         env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: python test_gemini.py
+        run: python main.py
