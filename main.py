@@ -5,14 +5,28 @@ import time
 import random
 import yfinance as yf
 import feedparser
-from datetime import datetime
+import pandas as pd
+from datetime import datetime, timedelta
 
 # ==========================================
-# 1. СБОР ДАННЫХ (5 ВЕТВЕЙ)
+# 1. СБОР РЕАЛЬНЫХ ДАННЫХ (7 ВЕТВЕЙ)
 # ==========================================
-def get_crypto_data():
+
+def get_fear_greed_index():
+    """Получаем РЕАЛЬНЫЙ индекс страха и жадности"""
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,toncoin&vs_currencies=usd&include_24hr_change=true"
+        url = "https://api.alternative.me/fng/?limit=1"
+        response = requests.get(url, timeout=10).json()
+        value = response['data'][0]['value']
+        classification = response['data'][0]['value_classification']
+        return int(value), classification
+    except Exception as e:
+        return None, f"Ошибка: {str(e)[:20]}"
+
+def get_crypto_data():
+    """Крипта с объемами торгов"""
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,toncoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true"
         response = requests.get(url, timeout=10).json()
         data = []
         names = {"bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL", "ripple": "XRP", "toncoin": "TON"}
@@ -20,14 +34,34 @@ def get_crypto_data():
             if key in response:
                 price = response[key]['usd']
                 change = response[key]['usd_24h_change']
-                data.append(f"• {name}: ${price:,.2f} ({change:+.2f}%)")
+                volume = response[key].get('usd_24h_vol', 0)
+                market_cap = response[key].get('usd_market_cap', 0)
+                vol_billion = volume / 1_000_000_000
+                data.append(f"• {name}: ${price:,.2f} ({change:+.2f}%) | Объем: ${vol_billion:.2f}B")
         return "\n".join(data)
     except Exception as e:
-        return f"• Крипта: Ошибка сбора данных ({str(e)[:30]})"
+        return f"• Крипта: Ошибка ({str(e)[:30]})"
+
+def get_support_resistance():
+    """Расчет уровней поддержки/сопротивления за последние 7 дней"""
+    try:
+        btc = yf.Ticker("BTC-USD")
+        hist = btc.history(period="7d")
+        if not hist.empty:
+            high = hist['High'].max()
+            low = hist['Low'].min()
+            close = hist['Close'].iloc[-1]
+            resistance = high
+            support = low
+            return f"BTC: Поддержка ${support:,.0f} | Сопротивление ${resistance:,.0f} | Текущая ${close:,.0f}"
+        return "BTC: Недоступно"
+    except Exception as e:
+        return f"BTC: Ошибка ({str(e)[:30]})"
 
 def get_finance_data():
+    """Традиционные рынки и сырье"""
     try:
-        tickers = {"GC=F": "Золото", "SI=F": "Серебро", "BZ=F": "Нефть Brent", "^GSPC": "S&P 500", "NVDA": "NVIDIA"}
+        tickers = {"GC=F": "Золото", "SI=F": "Серебро", "BZ=F": "Нефть Brent", "^GSPC": "S&P 500", "NVDA": "NVIDIA", "^DXY": "Индекс доллара (DXY)"}
         data = []
         for ticker, name in tickers.items():
             asset = yf.Ticker(ticker)
@@ -38,9 +72,10 @@ def get_finance_data():
                 data.append(f"• {name}: ${price:,.2f} ({change:+.2f}%)")
         return "\n".join(data)
     except Exception as e:
-        return f"• Рынки: Ошибка сбора данных ({str(e)[:30]})"
+        return f"• Рынки: Ошибка ({str(e)[:30]})"
 
 def get_news_data():
+    """Новости из RSS"""
     try:
         feeds = [
             "http://feeds.reuters.com/reuters/businessNews",
@@ -49,16 +84,15 @@ def get_news_data():
         headlines = []
         for feed_url in feeds:
             feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:2]:
+            for entry in feed.entries[:3]:
                 headlines.append(f"• {entry.title}")
-        return "\n".join(headlines[:4])
+        return "\n".join(headlines[:5])
     except Exception as e:
         return "• Новости: Ошибка сбора данных"
-
 # ==========================================
-# 2. ИИ-АНАЛИЗ (OPENROUTER)
+# 2. ИИ-АНАЛИЗ (OPENROUTER) С УЛУЧШЕННЫМ ПРОМПТОМ
 # ==========================================
-def get_ai_analysis(crypto, finance, news):
+def get_ai_analysis(fear_greed, crypto, support_resistance, finance, news):
     api_key = os.environ.get("OPENROUTER_API_KEY")
     url = "https://openrouter.ai/api/v1/chat/completions"
     
@@ -68,50 +102,70 @@ def get_ai_analysis(crypto, finance, news):
         "inclusionai/ling-3.0-flash-fin:free"
     ]
     
-    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик с харизмой. Твоя задача: создать СОЧНЫЙ, СТРУКТУРИРОВАННЫЙ и ЦЕПЛЯЮЩИЙ обзор рынка для Telegram-канала.
+    today = datetime.now().strftime("%d.%m.%Y")
+    fg_value, fg_class = fear_greed
+    
+    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ обзор рынка для Telegram-канала.
 
-СЕГОДНЯШНЯЯ ДАТА: {datetime.now().strftime("%d.%m.%Y")}
+ТЕКУЩАЯ ДАТА: {today} (используй ИМЕННО эту дату!)
 
-ВХОДНЫЕ ДАННЫЕ:
-[КРИПТА]: {crypto}
-[ТРАДИЦИОННЫЕ РЫНКИ И СЫРЬЕ]: {finance}
-[ГЕОПОЛИТИКА И НОВОСТИ]: {news}
+РЕАЛЬНЫЕ ДАННЫЕ:
+[ИНДЕКС СТРАХА/ЖАДНОСТИ]: {fg_value}/100 ({fg_class})
+[КРИПТА С ОБЪЕМАМИ]: {crypto}
+[УРОВНИ BTC]: {support_resistance}
+[ТРАДИЦИОННЫЕ РЫНКИ]: {finance}
+[НОВОСТИ]: {news}
 
-СТРОГАЯ СТРУКТУРА ОТВЕТА (следуй ей ПО ПУНКТАМ):
+СТРОГАЯ СТРУКТУРА (НЕ ПРОПУСКАЙ НИ ОДИН БЛОК):
 
-1. ЗАГОЛОВОК: "ПОЖАРНЫЙ ШПИОН: ОБЗОР РЫНКА" + дата
+🔥 ПОЖАРНЫЙ ШПИОН: ОБЗОР РЫНКА — {today}
 
-2. ГЛОБАЛЬНЫЙ СРЕЗ (2-3 предложения):
-   - Общее настроение рынка (быки/медведи, страх/жадность)
-   - Выдели ИНДЕКС СТРАХА/ЖАДНОСТИ отдельной строкой с эмодзи
-   - Ключевые движения BTC и ETH
+⚠️ ВАЖНО: Сначала риски, потом возможности!
 
-3. ДЕЙСТВИЯ КИТОВ (3-4 предложения):
-   - Куда перетекает капитал (из чего во что)
-   - Что делают институционалы
-   - Скрытые сигналы из ончейн-данных
+ РЫНОЧНЫЙ СРЕЗ:
+- Индекс страха/жадности: {fg_value}/100 ({fg_class})
+- Расшифровка: 0-24 = Extreme Fear, 25-49 = Fear, 50 = Neutral, 51-74 = Greed, 75-100 = Extreme Greed
+- Ключевые движения BTC и ETH с объемами
 
-4. ГЛАВНЫЕ НОВОСТИ (ОБЯЗАТЕЛЬНО!):
-   - Перечисли 2-3 ключевые новости из блока [ГЕОПОЛИТИКА И НОВОСТИ]
-   - Объясни их влияние на рынок (1 предложение на новость)
-   - Если новостей нет — напиши "Новостной фон: Спокойный, без геополитических шоков"
+🎯 УРОВНИ BTC:
+- Поддержка: [из данных]
+- Сопротивление: [из данных]
+- Текущая цена: [из данных]
+- Вывод: близко к поддержке/сопротивлению/между ними
 
-5. ТОРГОВАЯ ЭКСПЕРТИЗА (риск-менеджмент):
-   - 3 конкретных совета с нумерацией
-   - Формат: "[Действие]: [Пояснение]"
-   - Пример: "1. Стоп-лоссы: Обязательно ставь защиту на 2-3% ниже входа..."
+🐋 ДЕЙСТВИЯ КИТОВ:
+- Куда перетекает капитал
+- Ончейн-сигналы (если есть в данных)
+- Институциональная активность
 
-6. ДИСКЛЕЙМЕР (ОБЯЗАТЕЛЬНО В КОНЦЕ):
-   "ЮРИДИЧЕСКИЙ ДИСКЛЕЙМЕР: Вся информация носит исключительно ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств. Вы действуете на свой страх и риск (DYOR — Do Your Own Research)."
+📰 ГЛАВНЫЕ НОВОСТИ:
+- 2-3 новости из блока [НОВОСТИ]
+- Влияние на рынок (1 предложение)
+- Если новостей нет: "📰 Новостной фон: Спокойный"
 
-ПРАВИЛА ОФОРМЛЕНИЯ:
-- Используй жирный шрифт для ключевых цифр ($79,667) и активов (BTC, ETH, Золото)
+️ РИСК-МЕНЕДЖМЕНТ (ОБЯЗАТЕЛЬНО ПЕРЕД СОВЕТАМИ!):
+️ Предупреждение: "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
+
+ ТОРГОВЫЕ ИДЕИ (3 совета):
+1️⃣ [Конкретное действие]: [Пояснение с процентами]
+2️⃣ [Конкретное действие]: [Пояснение с процентами]
+3️⃣ [Конкретное действие]: [Пояснение с процентами]
+
+⚡ QUICK STATS:
+- 3-4 коротких факта с эмодзи
+
+⚖️ ДИСКЛЕЙМЕР:
+"⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research). Прошлые результаты не гарантируют будущую прибыль."
+
+ПРАВИЛА:
+- **Жирный шрифт** для цифр ($79,667) и активов (BTC, ETH)
 - Эмодзи: умеренно, только для структуры
-- Сленг: используй ("ликвидации", "памп", "альты", "стэйблы"), но РАСШИФРОВЫВАЙ в скобках для новичков
-- Тон: УВЕРЕННЫЙ, СРОЧНЫЙ, но БЕЗОПАСНЫЙ (не создавай панику)
-- Объем: 2500-3500 символов (чтобы влезло в 1 сообщение Telegram)
+- Сленг с расшифровками в скобках
+- Тон: ПРОФЕССИОНАЛЬНЫЙ, ОСТОРОЖНЫЙ, БЕЗ ПАНИКИ
+- Объем: 2500-3500 символов
+- НЕ используй "---" между блоками
 
-ПРИСТУПАЙ К АНАЛИЗУ!"""
+ПРИСТУПАЙ!"""
     
     for model in models:
         payload = {
@@ -131,7 +185,7 @@ def get_ai_analysis(crypto, finance, news):
         elif response.status_code == 429:
             continue
             
-    return "Ошибка: ИИ-аналитик временно недоступен из-за высокой нагрузки. Попробуйте позже."
+    return "Ошибка: ИИ временно недоступен. Попробуйте позже."
 
 # ==========================================
 # 3. ОТПРАВКА В TELEGRAM
@@ -143,7 +197,7 @@ def send_to_telegram(text):
     seed = random.randint(1, 99999)
     image_url = f"https://image.pollinations.ai/prompt/cyberpunk%20financial%20market%20data%20dark%20neon%20glowing%20charts?width=1200&height=600&nologo=true&seed={seed}"
     
-    caption = "ПОЖАРНЫЙ ШПИОН НА СВЯЗИ\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже"
+    caption = "🔥 ПОЖАРНЫЙ ШПИОН НА СВЯЗИ\n\nСистема завершила анализ 7 ветвей рынка. Полный разбор ниже 👇"
     
     photo_payload = {
         "chat_id": channel_id,
@@ -162,27 +216,29 @@ def send_to_telegram(text):
     response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=text_payload, timeout=15)
     
     if response.status_code == 200:
-        print("Пост успешно отправлен в Telegram!")
+        print("✅ Пост успешно отправлен!")
     else:
-        print(f"Ошибка Telegram: {response.text}")
+        print(f"❌ Ошибка Telegram: {response.text}")
 
 # ==========================================
 # 4. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("Запуск Пожарного Шпиона v21.0...")
-    print("Сбор данных по 5 ветвям...")
+    print(" Запуск Пожарного Шпиона v22.0 PROFESSIONAL...")
     
+    print("📡 Сбор данных...")
+    fear_greed = get_fear_greed_index()
     crypto = get_crypto_data()
+    support_resistance = get_support_resistance()
     finance = get_finance_data()
     news = get_news_data()
     
-    print("Запрос ИИ-анализа...")
-    analysis = get_ai_analysis(crypto, finance, news)
+    print("🧠 ИИ-анализ...")
+    analysis = get_ai_analysis(fear_greed, crypto, support_resistance, finance, news)
     
-    print("Публикация в Telegram...")
+    print("📤 Публикация...")
     send_to_telegram(analysis)
-    print("Миссия выполнена.")
+    print("✅ Миссия выполнена.")
 
 if __name__ == "__main__":
     main()
