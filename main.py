@@ -218,7 +218,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
         fg_emoji = "🟡"
         fg_signal = "НЕЙТРАЛЬНО"
     elif fg_value <= 74:
-        fg_emoji = ""
+        fg_emoji = "🟢"
         fg_signal = "ЖАДНОСТЬ"
     else:
         fg_emoji = "🔴"
@@ -240,7 +240,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [РЫНКИ]: {finance}
 [НОВОСТИ]: {news}
 
-️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
+⚠️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
 1. НЕ используй символы ## (заголовки Markdown)
 2. НЕ используй символ > (цитаты)
 3. НЕ используй --- (разделители)
@@ -255,9 +255,9 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 
 📈 ПЕРИОД АНАЛИЗА: {session_info['period']}
 
-⚠️ Сначала риски, потом возможности!
+️ Сначала риски, потом возможности!
 
-🪙 1. КРИПТОРЫНОК
+ 1. КРИПТОРЫНОК
 - BTC, ETH, SOL, XRP: цены, объёмы, изменения за период
 - Уровни поддержки/сопротивления BTC
 - Доминация BTC: {btc_dom:.1f}% — что это значит
@@ -291,24 +291,24 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 
 🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
 1️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
-2️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
+2️ [Конкретное действие]: [Пояснение с процентами и уровнями]
 3️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 
 ⚡ QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):
 Используй цветовую кодировку:
 - 🟢 зелёный = рост/бычий сигнал
-- 🔴 красный = падение/медвежий сигнал
+-  красный = падение/медвежий сигнал
 - 🟡 жёлтый = предупреждение/нейтрально
--  синий = факт/объём
+- 🔵 синий = факт/объём
 
 Включи ВСЕ эти метрики:
 - 🔵 BTC: [цена] ([изменение]%) — [комментарий]
-- 🟢 ETH: [цена] ([изменение]%) — [комментарий]
+-  ETH: [цена] ([изменение]%) — [комментарий]
 - 🔵 SOL: [цена] ([изменение]%) — [комментарий]
 - 🔵 XRP: [цена] ([изменение]%) — [комментарий]
--  Индекс страха/жадности: {fg_value}/100 — [комментарий]
--  Доминация BTC: {btc_dom:.1f}% — [комментарий]
--  Общая капитализация: ${total_mcap:.0f}B — [комментарий]
+- 🟡 Индекс страха/жадности: {fg_value}/100 — [комментарий]
+- 🔵 Доминация BTC: {btc_dom:.1f}% — [комментарий]
+- 🔵 Общая капитализация: ${total_mcap:.0f}B — [комментарий]
 - [цвет] S&P 500: [из данных] — [комментарий]
 - [цвет] Золото: [из данных] — [комментарий]
 - [цвет] Нефть Brent: [из данных] — [комментарий]
@@ -372,7 +372,7 @@ def get_post_footer(session_info):
         next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
     
     footer = f"""
- СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
+⏰ СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
 
 🔔 ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику. При резких изменениях в канал придёт экстренный сигнал.
@@ -430,26 +430,23 @@ def send_to_telegram(text, fear_greed=None):
         print("❌ Ошибка: TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID не установлены")
         return
     
-    # Генерируем обложку с профессиональными финансовыми графиками
-    seed = random.randint(1, 99999)
+    # Используем реальные профессиональные финансовые изображения
+    seed = random.randint(1, 1000)
     
-    # Стили графиков (как на твоих скриншотах)
-    chart_styles = [
-        "professional cryptocurrency trading chart Bitcoin Ethereum candlesticks dark blue theme financial data",
-        "trading terminal screen multiple charts stocks crypto commodities dark background professional",
-        "Bitcoin golden coin on trading chart background cryptocurrency investment analysis",
-        "financial market analysis candlestick charts graphs dark blue professional trading",
-        "stock market trading screen S&P 500 NASDAQ financial graphs professional terminal",
-        "cryptocurrency market analysis Bitcoin Ethereum charts technical analysis dark theme",
-        "professional trader analyzing multiple market charts screens dark office",
-        "Bitcoin Ethereum trading charts financial data visualization professional dark theme"
+    # Коллекция URL с реальными финансовыми графиками (Unsplash)
+    image_urls = [
+        f"https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop&random={seed}",
+        f"https://images.unsplash.com/photo-1621506289937-a8e6df2577ab?w=1200&h=600&fit=crop&random={seed}",
+        f"https://images.unsplash.com/photo-1639762681485-074b9f78399c?w=1200&h=600&fit=crop&random={seed}",
+        f"https://images.unsplash.com/photo-1642104704074-907c0698cbd9?w=1200&h=600&fit=crop&random={seed}",
+        f"https://images.unsplash.com/photo-1559526324-4b2ff7614b2f?w=1200&h=600&fit=crop&random={seed}",
+        f"https://images.unsplash.com/photo-1518186285589-2f18bd471d64?w=1200&h=600&fit=crop&random={seed}",
     ]
     
-    selected_style = random.choice(chart_styles)
+    # Выбираем случайное изображение
+    image_url = random.choice(image_urls)
     
-    image_url = f"https://image.pollinations.ai/prompt/{selected_style}?width=1200&height=600&nologo=true&seed={seed}"
-    
-    caption = " ИИ АНАЛИТИК НА СВЯЗИ\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+    caption = "📊 ИИ АНАЛИТИК НА СВЯЗИ\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
     
     photo_payload = {
         "chat_id": channel_id,
@@ -459,7 +456,7 @@ def send_to_telegram(text, fear_greed=None):
     }
     response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
     if response.status_code != 200:
-        print(f"️ Ошибка отправки картинки: {response.text}")
+        print(f"⚠️ Ошибка отправки картинки: {response.text}")
     time.sleep(2)
     
     # Умное разделение текста на части
@@ -474,7 +471,7 @@ def send_to_telegram(text, fear_greed=None):
         
         # Добавляем индикатор части
         if total_parts > 1:
-            header = f"📄 **ЧАСТЬ {i+1}/{total_parts}**\n\n"
+            header = f" **ЧАСТЬ {i+1}/{total_parts}**\n\n"
             footer_text = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
             part_with_indicator = header + part + footer_text
         else:
@@ -507,7 +504,7 @@ def send_to_telegram(text, fear_greed=None):
 # 7. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v27.2 (5 веток + профессиональные графики)...")
+    print("🚀 Запуск ИИ Аналитика v27.3 (5 веток + реальные финансовые графики)...")
     
     print("📡 Определение типа выпуска...")
     session_info = get_session_info()
