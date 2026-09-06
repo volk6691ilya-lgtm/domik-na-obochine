@@ -42,11 +42,11 @@ def get_session_info():
     }
 
 # ==========================================
-# 2. СБОР РЕАЛЬНЫХ ДАННЫХ
+# 2. СБОР РЕАЛЬНЫХ ДАННЫХ (5 ВЕТОК)
 # ==========================================
 
 def get_fear_greed_index():
-    """Получаем РЕАЛЬНЫЙ индекс страха и жадности"""
+    """Ветка 3 (МАКРО): Индекс страха и жадности"""
     try:
         url = "https://api.alternative.me/fng/?limit=1"
         response = requests.get(url, timeout=10).json()
@@ -57,7 +57,7 @@ def get_fear_greed_index():
         return None, f"Ошибка: {str(e)[:20]}"
 
 def get_global_data():
-    """Получаем доминацию BTC и общую капитализацию"""
+    """Ветка 1 (КРИПТА): Доминация BTC и капитализация"""
     try:
         url = "https://api.coingecko.com/api/v3/global"
         response = requests.get(url, timeout=10).json()
@@ -74,7 +74,7 @@ def get_global_data():
         return {'btc_dominance': 0, 'total_market_cap': 0, 'total_volume': 0}
 
 def get_crypto_data():
-    """Крипта с объемами торгов"""
+    """Ветка 1 (КРИПТА): Цены и объемы"""
     try:
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,toncoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true"
         response = requests.get(url, timeout=10).json()
@@ -92,7 +92,7 @@ def get_crypto_data():
         return f"• Крипта: Ошибка ({str(e)[:30]})"
 
 def get_support_resistance():
-    """Расчет уровней поддержки/сопротивления за последние 7 дней"""
+    """Ветка 1 (КРИПТА): Уровни BTC"""
     try:
         btc = yf.Ticker("BTC-USD")
         hist = btc.history(period="7d")
@@ -106,7 +106,7 @@ def get_support_resistance():
         return f"BTC: Ошибка ({str(e)[:30]})"
 
 def get_finance_data():
-    """Традиционные рынки и сырье"""
+    """Ветки 2 (СЫРЬЁ) и 3 (МАКРО) и 5 (IT): Золото, Нефть, S&P 500, NVIDIA, DXY"""
     try:
         tickers = {"GC=F": "Золото", "SI=F": "Серебро", "BZ=F": "Нефть Brent", "^GSPC": "S&P 500", "NVDA": "NVIDIA", "DX-Y.NYB": "Индекс доллара (DXY)"}
         data = []
@@ -151,7 +151,7 @@ def format_time_ago(published_time):
         return ""
 
 def get_news_data():
-    """Новости из RSS с временными метками и ссылками"""
+    """Ветки 4 (ГЕОПОЛИТИКА) и 5 (IT): Новости"""
     try:
         feeds = [
             "http://feeds.reuters.com/reuters/businessNews",
@@ -195,7 +195,7 @@ def generate_composite_chart(session_info):
             period_label = "12 ЧАСОВ (дневная сессия)"
         
         fig, axes = plt.subplots(3, 1, figsize=(10, 14), facecolor='#0d1117')
-        fig.suptitle(f'🔥 ПОЖАРНЫЙ ШПИОН: РЫНОЧНЫЙ ДАШБОРД ({period_label})\n{start_time.strftime("%d.%m %H:%M")} - {end_time.strftime("%d.%m %H:%M")} МСК', 
+        fig.suptitle(f'ПОЖАРНЫЙ ШПИОН: РЫНОЧНЫЙ ДАШБОРД ({period_label})\n{start_time.strftime("%d.%m %H:%M")} - {end_time.strftime("%d.%m %H:%M")} МСК', 
                      fontsize=14, fontweight='bold', color='white', y=0.98)
         
         # ПАНЕЛЬ 1: BTC с уровнями
@@ -245,23 +245,25 @@ def generate_composite_chart(session_info):
             ax2.text(0.5, 0.5, f'Ошибка: {str(e)[:50]}', ha='center', va='center', color='white', fontsize=12)
             ax2.set_title('2. Крипто-гонка: Относительная сила', color='white', fontsize=12, loc='left')
 
-        # ПАНЕЛЬ 3: Макро-фон
+        # ПАНЕЛЬ 3: Макро-фон (дневные данные)
         ax3 = axes[2]
         try:
             macros = {"^GSPC": "S&P 500", "GC=F": "Золото", "DX-Y.NYB": "DXY"}
             for ticker, label in macros.items():
                 asset = yf.Ticker(ticker)
-                df = asset.history(start=start_time, end=end_time, interval="15m")
+                df = asset.history(period="7d")
                 if not df.empty:
-                    normalized = (df['Close'] / df['Close'].iloc[0]) * 100
-                    ax3.plot(normalized.index, normalized, label=label, linewidth=2)
+                    df = df[df.index >= start_time.date()]
+                    if not df.empty:
+                        normalized = (df['Close'] / df['Close'].iloc[0]) * 100
+                        ax3.plot(normalized.index, normalized, label=label, linewidth=2)
             
             ax3.set_title('3. Макро-фон: Традиционные рынки (старт = 100%)', color='white', fontsize=12, loc='left')
             ax3.legend(loc='upper left', fontsize=9)
             ax3.grid(True, alpha=0.2)
             ax3.tick_params(colors='white')
-            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m\n%H:%M'))
-            ax3.xaxis.set_major_locator(mdates.HourLocator(interval=3))
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m'))
+            ax3.xaxis.set_major_locator(mdates.DayLocator())
         except Exception as e:
             ax3.text(0.5, 0.5, f'Ошибка: {str(e)[:50]}', ha='center', va='center', color='white', fontsize=12)
             ax3.set_title('3. Макро-фон: Традиционные рынки', color='white', fontsize=12, loc='left')
@@ -283,7 +285,7 @@ def generate_composite_chart(session_info):
         return None
 
 # ==========================================
-# 4. ИИ-АНАЛИЗ
+# 4. ИИ-АНАЛИЗ (5 ВЕТОК)
 # ==========================================
 def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news):
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -306,16 +308,16 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
         fg_emoji = "🟠"
         fg_signal = "СТРАХ"
     elif fg_value <= 51:
-        fg_emoji = "🟡"
+        fg_emoji = ""
         fg_signal = "НЕЙТРАЛЬНО"
     elif fg_value <= 74:
         fg_emoji = "🟢"
         fg_signal = "ЖАДНОСТЬ"
     else:
-        fg_emoji = "🔴"
+        fg_emoji = ""
         fg_signal = "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
     
-    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ обзор рынка.
+    prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ обзор рынка для Telegram-канала.
 
 КОНТЕКСТ:
 - Тип: {session_info['name']} выпуск
@@ -331,47 +333,92 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [РЫНКИ]: {finance}
 [НОВОСТИ]: {news}
 
-СТРУКТУРА:
+⚠️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
+1. НЕ используй символы ## (заголовки Markdown)
+2. НЕ используй символ > (цитаты)
+3. НЕ используй --- (разделители)
+4. НЕ используй таблицы с |
+5. Используй ТОЛЬКО: обычный текст, **жирный шрифт**, эмодзи для структуры
+6. Сохраняй КЛИКАБЕЛЬНЫЕ ССЫЛКИ в новостях в формате [текст](url) — НЕ УДАЛЯЙ ИХ!
+
+СТРУКТУРА ПОСТА (ВСЕ БЛОКИ ОБЯЗАТЕЛЬНЫ):
 
 🔥 ПОЖАРНЫЙ ШПИОН: {session_info['name']} ОБЗОР — {session_info['date']}
 
 📊 ПЕРИОД АНАЛИЗА: {session_info['period']}
 
-⚠️ Сначала риски, потом возможности!
+️ Сначала риски, потом возможности!
 
-🌍 РЫНОЧНЫЙ СРЕЗ:
-- {fg_emoji} Индекс страха/жадности: {fg_value}/100 ({fg_class})
-- Расшифровка: 0-24=Extreme Fear, 25-49=Fear, 50=Neutral, 51-74=Greed, 75-100=Extreme Greed
+🪙 1. КРИПТОРЫНОК
+- BTC, ETH, SOL, XRP: цены, объёмы, изменения за период
+- Уровни поддержки/сопротивления BTC
+- Доминация BTC: {btc_dom:.1f}% — что это значит
+- Общая капитализация: ${total_mcap:.0f}B
+- Анализ: что происходит и почему
 
- УРОВНИ BTC:
-- Поддержка: [из данных]
-- Сопротивление: [из данных]
-- Текущая цена: [из данных]
+🛢️ 2. СЫРЬЁ
+- Золото, Серебро, Нефть Brent: цены и изменения
+- Связь с инфляцией и риск-аппетитом
+- Анализ: куда движутся "умные деньги"
 
-🐋 ДЕЙСТВИЯ КИТОВ:
-- Анализ движений капитала
+🌍 3. МАКРО-ФОН
+- S&P 500, DXY (индекс доллара): цены и изменения
+- Индекс страха/жадности: {fg_value}/100 ({fg_class})
+- Анализ: риск-он или риск-офф?
 
-📰 ГЛАВНЫЕ НОВОСТИ:
-- 2-3 новости с временными метками
+🌐 4. ГЕОПОЛИТИКА
+- Новости из блока [НОВОСТИ] (регуляция, законы, санкции)
+- СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ [текст](url) — НЕ ПЕРЕПИСЫВАЙ!
+- Временные метки [X ч. назад]
+- Влияние на рынки
+
+💻 5. IT И ТЕХНОЛОГИИ
+- NVIDIA: цена и изменение
+- Новости про ETF, биржи, институционалов
+- Анализ: куда движется "умный капитал"
+
+🔗 СВЯЗЬ ВЕТОК:
+- Как геополитика/IT влияют на крипту
+- Комплексный вывод: что это значит для рынка
+
+🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
+1️ [Конкретное действие]: [Пояснение с процентами и уровнями]
+2️ [Конкретное действие]: [Пояснение с процентами и уровнями]
+3️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
+
+ QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):
+Используй цветовую кодировку:
+- 🟢 зелёный = рост/бычий сигнал
+- 🔴 красный = падение/медвежий сигнал
+- 🟡 жёлтый = предупреждение/нейтрально
+- 🔵 синий = факт/объём
+
+Включи ВСЕ эти метрики:
+- 🔵 BTC: [цена] ([изменение]%) — [комментарий]
+- 🟢 ETH: [цена] ([изменение]%) — [комментарий]
+- 🔵 SOL: [цена] ([изменение]%) — [комментарий]
+- 🔵 XRP: [цена] ([изменение]%) — [комментарий]
+- 🟡 Индекс страха/жадности: {fg_value}/100 — [комментарий]
+- 🔵 Доминация BTC: {btc_dom:.1f}% — [комментарий]
+- 🔵 Общая капитализация: ${total_mcap:.0f}B — [комментарий]
+- [цвет] S&P 500: [из данных] — [комментарий]
+- [цвет] Золото: [из данных] — [комментарий]
+- [цвет] Нефть Brent: [из данных] — [комментарий]
+- [цвет] NVIDIA: [из данных] — [комментарий]
+- [цвет] DXY: [из данных] — [комментарий]
 
 ⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
-"Торговля сопряжена с риском потери ВСЕГО депозита."
+"Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
 
- ТОРГОВЫЕ ИДЕИ (3 совета):
-1️⃣ [Действие]: [Пояснение]
-2️⃣ [Действие]: [Пояснение]
-3️⃣ [Действие]: [Пояснение]
+⚖️ ДИСКЛЕЙМЕР (ТОЧНЫЙ ТЕКСТ, НЕ СОКРАЩАТЬ!):
+"⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль."
 
- QUICK STATS:
-- Используй цветовую кодировку: 🟢🟡🔵
-
-⚖️ ДИСКЛЕЙМЕР:
-"⚠️ Информация носит ознакомительный характер. Риск потери до 100% депозита. DYOR."
-
-ПРАВИЛА:
-- Жирный шрифт для цифр и активов
-- Сленг с расшифровками
-- Объем: до 4000 символов
+ПРАВИЛА СТИЛЯ:
+- Тон: профессиональный, но живой (не сухой)
+- Сленг с расшифровками в скобках: "лонг сквизнуло (long squeeze — принудительное закрытие позиций)"
+- Конкретные цифры и проценты
+- БЕЗ ВОДЫ: каждое предложение должно нести информацию
+- Объём: 3500-4000 символов (подробно, но без повторов)
 - НЕ добавляй информацию о следующем выпуске — система добавит автоматически
 
 ПРИСТУПАЙ!"""
@@ -419,20 +466,53 @@ def get_post_footer(session_info):
     footer = f"""
 ⏰ СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
 
- ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
+🔔 ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику. При резких изменениях в канал придёт экстренный сигнал.
 
 👍 Если обзор был полезен — ставь реакцию!
- Подписывайся на канал, чтобы не пропустить важные сигналы."""
+📢 Подписывайся на канал, чтобы не пропустить важные сигналы."""
     
     return footer
 
 # ==========================================
 # 6. ОТПРАВКА В TELEGRAM
 # ==========================================
-def send_to_telegram(text, chart_buffer=None):
+def send_to_telegram(text, chart_buffer=None, fear_greed=None):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
+    
+    # Генерируем умную обложку
+    seed = random.randint(1, 99999)
+    
+    fg_value = fear_greed[0] if fear_greed and fear_greed[0] else 50
+    if fg_value <= 24:
+        color_theme = "red dark dramatic crash falling"
+        effect = "chaos panic"
+    elif fg_value <= 49:
+        color_theme = "orange dark moody"
+        effect = "shadow uncertainty"
+    elif fg_value <= 51:
+        color_theme = "gray neutral foggy"
+        effect = "mist fog"
+    elif fg_value <= 74:
+        color_theme = "green dark bullish"
+        effect = "growth rising"
+    else:
+        color_theme = "bright green neon"
+        effect = "breakout new highs"
+    
+    image_url = f"https://image.pollinations.ai/prompt/cyberpunk%20financial%20market%20data%20{color_theme}%20{effect}%20glowing%20charts%20dark%20background?width=1200&height=600&nologo=true&seed={seed}"
+    
+    caption = "🔥 ПОЖАРНЫЙ ШПИОН НА СВЯЗИ\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+    
+    photo_payload = {
+        "chat_id": channel_id,
+        "photo": image_url,
+        "caption": caption,
+        "parse_mode": "Markdown"
+    }
+    requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
+    time.sleep(2)
     
     # Отправляем дашборд
     if chart_buffer:
@@ -441,7 +521,7 @@ def send_to_telegram(text, chart_buffer=None):
             files = {
                 'photo': ('dashboard.png', chart_buffer, 'image/png'),
                 'chat_id': (None, channel_id),
-                'caption': (None, "🔥 ПОЖАРНЫЙ ШПИОН: РЫНОЧНЫЙ ДАШБОРД (12 ЧАСОВ)\n\nГрафики подтверждают анализ ниже "),
+                'caption': (None, " ПОЖАРНЫЙ ШПИОН: РЫНОЧНЫЙ ДАШБОРД (12 ЧАСОВ)\n\nГрафики подтверждают анализ ниже 👇"),
                 'parse_mode': (None, 'Markdown')
             }
             response = requests.post(
@@ -496,7 +576,7 @@ def send_to_telegram(text, chart_buffer=None):
             time.sleep(3)
         
         if total_parts > 1:
-            header = f"📄 **ЧАСТЬ {i+1}/{total_parts}**\n\n"
+            header = f" **ЧАСТЬ {i+1}/{total_parts}**\n\n"
             footer = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
             part_with_indicator = header + part + footer
         else:
@@ -521,14 +601,14 @@ def send_to_telegram(text, chart_buffer=None):
 # 7. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print(" Запуск Пожарного Шпиона v24.0 с дашбордом...")
+    print("🔥 Запуск Пожарного Шпиона v25.0 (5 веток)...")
     
     print("📡 Определение типа выпуска...")
     session_info = get_session_info()
     print(f"   Тип: {session_info['name']} выпуск")
     print(f"   Период: {session_info['period']}")
     
-    print(" Сбор данных...")
+    print("📡 Сбор данных (5 веток)...")
     fear_greed = get_fear_greed_index()
     global_data = get_global_data()
     crypto = get_crypto_data()
@@ -536,24 +616,24 @@ def main():
     finance = get_finance_data()
     news = get_news_data()
     
-    print(" Генерация дашборда за 12 часов...")
+    print("📊 Генерация дашборда за 12 часов...")
     chart_buffer = generate_composite_chart(session_info)
     
     print("🧠 ИИ-анализ (30-60 секунд)...")
     try:
         analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
     except Exception as e:
-        print(f" Ошибка ИИ-анализа: {e}")
+        print(f"❌ Ошибка ИИ-анализа: {e}")
         analysis = "Ошибка генерации анализа."
     
     print("📎 Добавление футера...")
     footer = get_post_footer(session_info)
     full_text = analysis + "\n\n" + footer
     
-    print(f"📏 Длина текста: {len(full_text)} символов")
+    print(f" Длина текста: {len(full_text)} символов")
     
     print("📤 Публикация...")
-    send_to_telegram(full_text, chart_buffer)
+    send_to_telegram(full_text, chart_buffer, fear_greed)
     print("✅ Миссия выполнена.")
 
 if __name__ == "__main__":
