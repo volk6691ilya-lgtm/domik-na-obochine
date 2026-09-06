@@ -209,13 +209,13 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
         fg_emoji = "🟠"
         fg_signal = "СТРАХ"
     elif fg_value <= 51:
-        fg_emoji = "🟡"
+        fg_emoji = ""
         fg_signal = "НЕЙТРАЛЬНО"
     elif fg_value <= 74:
         fg_emoji = "🟢"
         fg_signal = "ЖАДНОСТЬ"
     else:
-        fg_emoji = "🔴"
+        fg_emoji = ""
         fg_signal = "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
     
     prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков. Создай ОБЪЕКТИВНЫЙ обзор рынка для Telegram-канала.
@@ -234,7 +234,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [РЫНКИ]: {finance}
 [НОВОСТИ]: {news}
 
-️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
+⚠️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
 1. НЕ используй символы ## (заголовки Markdown)
 2. НЕ используй символ > (цитаты)
 3. НЕ используй --- (разделители)
@@ -283,36 +283,36 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Как геополитика/IT влияют на крипту
 - Комплексный вывод: что это значит для рынка
 
- ТОРГОВЫЕ ИДЕИ (3 совета):
+🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
 1️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 2️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 3️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 
 ⚡ QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):
 Используй цветовую кодировку:
--  зелёный = рост/бычий сигнал
--  красный = падение/медвежий сигнал
+- 🟢 зелёный = рост/бычий сигнал
+- 🔴 красный = падение/медвежий сигнал
 - 🟡 жёлтый = предупреждение/нейтрально
 - 🔵 синий = факт/объём
 
 Включи ВСЕ эти метрики:
 - 🔵 BTC: [цена] ([изменение]%) — [комментарий]
--  ETH: [цена] ([изменение]%) — [комментарий]
-- 🔵 SOL: [цена] ([изменение]%) — [комментарий]
+- 🟢 ETH: [цена] ([изменение]%) — [комментарий]
+-  SOL: [цена] ([изменение]%) — [комментарий]
 - 🔵 XRP: [цена] ([изменение]%) — [комментарий]
 - 🟡 Индекс страха/жадности: {fg_value}/100 — [комментарий]
 - 🔵 Доминация BTC: {btc_dom:.1f}% — [комментарий]
--  Общая капитализация: ${total_mcap:.0f}B — [комментарий]
+- 🔵 Общая капитализация: ${total_mcap:.0f}B — [комментарий]
 - [цвет] S&P 500: [из данных] — [комментарий]
 - [цвет] Золото: [из данных] — [комментарий]
 - [цвет] Нефть Brent: [из данных] — [комментарий]
 - [цвет] NVIDIA: [из данных] — [комментарий]
 - [цвет] DXY: [из данных] — [комментарий]
 
-️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
+⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
 
-️ ДИСКЛЕЙМЕР (ТОЧНЫЙ ТЕКСТ, НЕ СОКРАЩАТЬ!):
+⚖️ ДИСКЛЕЙМЕР (ТОЧНЫЙ ТЕКСТ, НЕ СОКРАЩАТЬ!):
 "⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль."
 
 ПРАВИЛА СТИЛЯ:
@@ -412,40 +412,66 @@ def smart_split_text(text, max_len=4000):
     return parts
 
 # ==========================================
-# 6. ГЕНЕРАЦИЯ И СКАЧИВАНИЕ КАРТИНКИ
+# 6. ТВОЯ КОЛЛЕКЦИЯ КАРТИНОК
 # ==========================================
-def get_cover_image(fear_greed):
-    """Генерирует и скачивает профессиональную обложку"""
-    seed = random.randint(1, 99999)
-    
-    # Точные промпты для финансовых графиков
-    chart_styles = [
-        "professional cryptocurrency trading chart with Bitcoin candlesticks dark blue theme financial data visualization",
-        "trading terminal screen with multiple financial charts stocks crypto commodities dark background",
-        "Bitcoin golden coin on trading chart background cryptocurrency investment analysis professional",
-        "financial market analysis candlestick charts graphs dark blue professional trading terminal",
-        "stock market trading screen S&P 500 NASDAQ financial graphs professional dark theme",
-        "cryptocurrency market analysis Bitcoin Ethereum charts technical analysis dark professional",
-        "professional trader analyzing multiple market charts screens dark office financial data",
-        "Bitcoin Ethereum trading charts financial data visualization professional dark blue theme"
+# 🔧 ДОБАВЛЯЙ СЮДА СВОИ ССЫЛКИ НА КАРТИНКИ!
+COVER_IMAGES = {
+    'bullish': [  # Для роста/позитива
+        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1621506289937-a8e6df2577ab?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1639762681485-074b9f78399c?w=1200&h=600&fit=crop",
+        # Добавь сюда свои ссылки на картинки для бычьего рынка
+    ],
+    'bearish': [  # Для падения/негатива
+        "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1559526324-4b2ff7614b2f?w=1200&h=600&fit=crop",
+        # Добавь сюда свои ссылки на картинки для медвежьего рынка
+    ],
+    'neutral': [  # Для нейтрального/боковика
+        "https://images.unsplash.com/photo-1518186285589-2f18bd471d64?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
+        # Добавь сюда свои ссылки на картинки для нейтрального рынка
     ]
+}
+
+def get_cover_image(fear_greed):
+    """Выбирает картинку из твоей коллекции на основе настроения рынка"""
+    fg_value = fear_greed[0] if fear_greed and fear_greed[0] else 50
     
-    selected_style = random.choice(chart_styles)
+    # Определяем настроение рынка
+    if fg_value <= 30:
+        mood = 'bearish'  # Страх/паника
+    elif fg_value >= 70:
+        mood = 'bullish'  # Жадность/эйфория
+    else:
+        mood = 'neutral'  # Нейтрально
     
-    # Генерируем через Pollinations
-    image_url = f"https://image.pollinations.ai/prompt/{selected_style}?width=1200&height=600&nologo=true&seed={seed}"
+    # Выбираем случайную картинку из соответствующей категории
+    if COVER_IMAGES.get(mood):
+        image_url = random.choice(COVER_IMAGES[mood])
+    else:
+        # Если категория пустая — берём из любой
+        all_images = []
+        for images in COVER_IMAGES.values():
+            all_images.extend(images)
+        image_url = random.choice(all_images) if all_images else None
     
+    if not image_url:
+        print("⚠️ Нет картинок в коллекции!")
+        return None
+    
+    # Скачиваем картинку
     try:
-        # Скачиваем картинку
+        print(f"🎨 Скачивание картинки (настроение: {mood})...")
         response = requests.get(image_url, timeout=30)
         if response.status_code == 200 and len(response.content) > 1000:
             print("✅ Картинка скачана успешно")
             return BytesIO(response.content)
         else:
-            print(f"⚠️ Ошибка скачивания: статус {response.status_code}, размер {len(response.content)}")
+            print(f"️ Ошибка скачивания: статус {response.status_code}")
             return None
     except Exception as e:
-        print(f"⚠️ Ошибка при скачивании картинки: {e}")
+        print(f"⚠️ Ошибка при скачивании: {e}")
         return None
 
 # ==========================================
@@ -459,8 +485,8 @@ def send_to_telegram(text, fear_greed=None):
         print("❌ Ошибка: TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID не установлены")
         return
     
-    # Генерируем и скачиваем обложку
-    print("🎨 Генерация обложки...")
+    # Получаем картинку из коллекции
+    print("🎨 Выбор картинки из коллекции...")
     image_buffer = get_cover_image(fear_greed)
     
     if image_buffer:
@@ -486,7 +512,7 @@ def send_to_telegram(text, fear_greed=None):
             print(f"⚠️ Ошибка отправки картинки: {response.text}")
         time.sleep(2)
     else:
-        print("️ Картинка не получена, отправляем только текст")
+        print("⚠️ Картинка не получена, отправляем только текст")
     
     # Умное разделение текста на части
     parts = smart_split_text(text, max_len=4000)
@@ -530,9 +556,9 @@ def send_to_telegram(text, fear_greed=None):
 # 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v28.0 (5 веток + надёжные картинки)...")
+    print("🚀 Запуск ИИ Аналитика v29.0 (5 веток + твоя коллекция картинок)...")
     
-    print("📡 Определение типа выпуска...")
+    print(" Определение типа выпуска...")
     session_info = get_session_info()
     print(f"   Тип: {session_info['name']} выпуск")
     print(f"   Период: {session_info['period']}")
@@ -545,7 +571,7 @@ def main():
     finance = get_finance_data()
     news = get_news_data()
     
-    print(" ИИ-анализ (30-60 секунд)...")
+    print("🧠 ИИ-анализ (30-60 секунд)...")
     try:
         analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
     except Exception as e:
