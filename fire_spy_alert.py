@@ -37,19 +37,16 @@ def check_last_alert():
         bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
         channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
         
-        # Получаем последние сообщения из канала
         url = f"https://api.telegram.org/bot{bot_token}/getUpdates"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
             updates = response.json().get('result', [])
             
-            # Ищем последнее сообщение от бота в канале
             for update in reversed(updates):
                 if 'channel_post' in update:
                     post = update['channel_post']
                     if post.get('chat', {}).get('id') == int(channel_id):
-                        # Проверяем, был ли это сигнал Пожарного Шпиона
                         if 'ПОЖАРНЫЙ ШПИОН' in post.get('text', ''):
                             post_time = datetime.fromtimestamp(post['date'])
                             minutes_ago = (datetime.now() - post_time).total_seconds() / 60
@@ -70,7 +67,6 @@ def check_price_movements():
     """Проверяет резкие движения цен за последний час"""
     alerts = []
     
-    # Проверяем крипту
     for ticker, name in CRYPTO_TICKERS.items():
         try:
             asset = yf.Ticker(ticker)
@@ -93,7 +89,6 @@ def check_price_movements():
         except Exception as e:
             print(f"⚠️ Ошибка проверки {name}: {e}")
     
-    # Проверяем акции/сырьё
     for ticker, name in STOCK_TICKERS.items():
         try:
             asset = yf.Ticker(ticker)
@@ -114,12 +109,160 @@ def check_price_movements():
                     })
                     print(f"🚨 {name}: {change_percent:+.2f}% за час!")
         except Exception as e:
-            print(f"️ Ошибка проверки {name}: {e}")
+            print(f"⚠️ Ошибка проверки {name}: {e}")
     
     return alerts
 
 # ==========================================
-# 3. ГЕНЕРАЦИЯ ГРАФИКА
+# 3. СБОР НОВОСТЕЙ (ГЕОПОЛИТИКА + IT + ФИНАНСЫ)
+# ==========================================
+def get_all_news():
+    """Собирает новости из всех источников"""
+    news_data = {
+        'geopolitics': [],
+        'it_tech': [],
+        'finance': []
+    }
+    
+    feeds = {
+        'geopolitics': [
+            "http://feeds.reuters.com/reuters/worldNews",
+            "http://feeds.reuters.com/reuters/businessNews"
+        ],
+        'it_tech': [
+            "https://techcrunch.com/feed/",
+            "https://www.coindesk.com/arc/outboundfeeds/rss/"
+        ],
+        'finance': [
+            "https://cointelegraph.com/rss",
+            "http://feeds.reuters.com/reuters/businessNews"
+        ]
+    }
+    
+    for category, feed_urls in feeds.items():
+        for feed_url in feed_urls:
+            try:
+                feed = feedparser.parse(feed_url)
+                for entry in feed.entries[:5]:
+                    title = entry.title
+                    link = entry.get('link', '')
+                    summary = entry.get('summary', '')[:200]
+                    
+                    title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
+                    
+                    if link:
+                        news_data[category].append({
+                            'title': title_safe,
+                            'link': link,
+                            'summary': summary
+                        })
+            except Exception as e:
+                print(f"⚠️ Ошибка загрузки {category} из {feed_url}: {e}")
+    
+    return news_data
+
+# ==========================================
+# 4. АНАЛИЗ ПРИЧИН ЧЕРЕЗ ИИ
+# ==========================================
+def analyze_causes_with_ai(alerts, news_data):
+    """ИИ анализирует причины скачков на основе новостей"""
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    
+    if not api_key:
+        print("⚠️ OPENROUTER_API_KEY не найден, используем простой анализ")
+        return format_simple_causes(news_data)
+    
+    # Формируем данные для ИИ
+    alerts_text = ""
+    for alert in alerts:
+        direction = "рост" if alert['change'] > 0 else "падение"
+        alerts_text += f"- {alert['name']}: {alert['change']:+.2f}% ({direction})\n"
+    
+    news_text = ""
+    for category, news_list in news_data.items():
+        category_name = {
+            'geopolitics': 'ГЕОПОЛИТИКА',
+            'it_tech': 'IT И ТЕХНОЛОГИИ',
+            'finance': 'ФИНАНСЫ И КРИПТО'
+        }.get(category, category)
+        
+        news_text += f"\n[{category_name}]:\n"
+        for item in news_list[:3]:
+            news_text += f"- {item['title']}\n  Ссылка: {item['link']}\n"
+    
+    prompt = f"""Произошли резкие движения рынка:
+
+{alerts_text}
+
+Последние новости:
+{news_text}
+
+ЗАДАЧА:
+1. Определи, какие новости могли вызвать эти скачки
+2. Для каждой причины укажи:
+   - Краткое описание (1-2 предложения)
+   - Кликабельную ссылку в формате [текст](url)
+3. Если причин несколько — перечисли все
+4. Если явной причины нет — так и скажи
+
+ФОРМАТ ОТВЕТА (строго):
+🔍 ПРИЧИНЫ СКАЧКА:
+
+1. [Краткое описание] — [ссылка](url)
+2. [Краткое описание] — [ссылка](url)
+
+ИЛИ (если причин нет):
+🔍 ПРИЧИНЫ СКАЧКА:
+Явных новостных триггеров не обнаружено. Возможно, техническая коррекция или крупная сделка.
+
+ОТВЕТЬ ТОЛЬКО В ЭТОМ ФОРМАТЕ, БЕЗ ДОПОЛНИТЕЛЬНЫХ КОММЕНТАРИЕВ."""
+    
+    try:
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        payload = {
+            "model": "minimax/minimax-m3:free",
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+        else:
+            print(f"⚠️ ИИ недоступен (статус {response.status_code}), используем простой анализ")
+            return format_simple_causes(news_data)
+    except Exception as e:
+        print(f"⚠️ Ошибка ИИ-анализа: {e}")
+        return format_simple_causes(news_data)
+
+# ==========================================
+# 5. ПРОСТОЙ АНАЛИЗ (БЕЗ ИИ)
+# ==========================================
+def format_simple_causes(news_data):
+    """Форматирует новости без ИИ-анализа"""
+    causes_text = "🔍 ПОСЛЕДНИЕ НОВОСТИ:\n\n"
+    
+    for category, news_list in news_data.items():
+        category_name = {
+            'geopolitics': '🌐 ГЕОПОЛИТИКА',
+            'it_tech': ' IT И ТЕХНОЛОГИИ',
+            'finance': '📊 ФИНАНСЫ'
+        }.get(category, category)
+        
+        if news_list:
+            causes_text += f"{category_name}:\n"
+            for item in news_list[:2]:
+                causes_text += f"• [{item['title']}]({item['link']})\n"
+            causes_text += "\n"
+    
+    return causes_text
+
+# ==========================================
+# 6. ГЕНЕРАЦИЯ ГРАФИКА
 # ==========================================
 def generate_alert_chart(alerts):
     """Генерирует график для всех алертов"""
@@ -127,7 +270,6 @@ def generate_alert_chart(alerts):
         if not alerts:
             return None
         
-        # Берём первый алерт для графика (самый сильный)
         main_alert = max(alerts, key=lambda x: abs(x['change']))
         
         asset = yf.Ticker(main_alert['ticker'])
@@ -142,7 +284,7 @@ def generate_alert_chart(alerts):
         
         if main_alert['change'] > 0:
             color = '#00ff00'
-            title_emoji = "📈"
+            title_emoji = ""
         else:
             color = '#ff0000'
             title_emoji = "📉"
@@ -182,42 +324,14 @@ def generate_alert_chart(alerts):
         
         return buf
     except Exception as e:
-        print(f" Ошибка генерации графика: {e}")
+        print(f"⚠️ Ошибка генерации графика: {e}")
         return None
 
 # ==========================================
-# 4. ПОЛУЧЕНИЕ НОВОСТЕЙ
+# 7. ОТПРАВКА СИГНАЛА
 # ==========================================
-def get_recent_news():
-    """Получает последние новости"""
-    try:
-        feeds = [
-            "http://feeds.reuters.com/reuters/businessNews",
-            "https://cointelegraph.com/rss"
-        ]
-        headlines = []
-        for feed_url in feeds:
-            feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:3]:
-                title = entry.title
-                link = entry.get('link', '')
-                
-                title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
-                
-                if link:
-                    headlines.append(f"[{title_safe}]({link})")
-                else:
-                    headlines.append(title_safe)
-        
-        return "\n".join(headlines[:3])
-    except Exception as e:
-        return "Новости недоступны"
-
-# ==========================================
-# 5. ОТПРАВКА СИГНАЛА
-# ==========================================
-def send_alert(alerts, chart_buffer):
-    """Отправляет объединённый сигнал"""
+def send_alert(alerts, chart_buffer, causes_text):
+    """Отправляет сигнал с анализом причин"""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
@@ -225,49 +339,43 @@ def send_alert(alerts, chart_buffer):
     alerts_text = ""
     for alert in alerts:
         change_emoji = "" if alert['change'] < 0 else "🟢"
-        alerts_text += f"{change_emoji} {alert['name']}: {alert['change']:+.2f}% (цена: ${alert['current_price']:,.2f})\n"
+        alerts_text += f"{change_emoji} **{alert['name']}**: {alert['change']:+.2f}% (цена: ${alert['current_price']:,.2f})\n"
     
     # Определяем общее направление
     avg_change = sum(a['change'] for a in alerts) / len(alerts)
-    direction = "ПАДЕНИЕ" if avg_change < 0 else "РОСТ"
-    
-    # Получаем новости
-    news = get_recent_news()
     
     # Формируем план действий
     if avg_change < 0:
         action_plan = """
 🎯 ЧТО ДЕЛАТЬ:
-- Если в лонге: рассмотрите стоп-лосс ниже текущей цены (-3-5%)
-- Если в шорте: зафиксируйте часть прибыли
-- Если вне рынка: не ловите падающий нож, ждите стабилизации
-- Уменьшите размер позиций до прояснения ситуации
+• Если в лонге: рассмотрите стоп-лосс ниже текущей цены (-3-5%)
+• Если в шорте: зафиксируйте часть прибыли
+• Если вне рынка: не ловите падающий нож, ждите стабилизации
+• Уменьшите размер позиций до прояснения ситуации
 """
     else:
         action_plan = """
 🎯 ЧТО ДЕЛАТЬ:
-- Если в шорте: рассмотрите стоп-лосс выше текущей цены (+3-5%)
-- Если в лонге: зафиксируйте часть прибыли на сопротивлениях
-- Если вне рынка: не входите на хаях, ждите отката
-- Не поддавайтесь FOMO, даже если рынок растёт
+• Если в шорте: рассмотрите стоп-лосс выше текущей цены (+3-5%)
+• Если в лонге: зафиксируйте часть прибыли на сопротивлениях
+• Если вне рынка: не входите на хаях, ждите отката
+• Не поддавайтесь FOMO, даже если рынок растёт
 """
     
     alert_text = f"""
- ПОЖАРНЫЙ ШПИОН: ЭКСТРЕННЫЙ СИГНАЛ
+🚨 **ПОЖАРНЫЙ ШПИОН: ЭКСТРЕННЫЙ СИГНАЛ**
 
 Обнаружены резкие движения рынка:
 
 {alerts_text}
-📊 ГРАФИК: см. выше
+📊 **ГРАФИК**: см. выше
 
-🔍 ВОЗМОЖНЫЕ ПРИЧИНЫ:
-{news}
-
+{causes_text}
 {action_plan}
-⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
+⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ**:
 Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью.
 
-️ ДИСКЛЕЙМЕР:
+️ **ДИСКЛЕЙМЕР**:
 ⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль.
 """
     
@@ -290,7 +398,7 @@ def send_alert(alerts, chart_buffer):
         time.sleep(2)
     
     # Отправляем текст
-    print("📤 Отправка текста сигнала...")
+    print(" Отправка текста сигнала...")
     text_payload = {
         "chat_id": channel_id,
         "text": alert_text,
@@ -308,15 +416,14 @@ def send_alert(alerts, chart_buffer):
         print(f"❌ Ошибка отправки: {response.text}")
 
 # ==========================================
-# 6. ГЛАВНЫЙ ЗАПУСК
+# 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
     print("🚨 Запуск Пожарного Шпиона...")
     print(f"📡 Мониторинг: {len(CRYPTO_TICKERS)} крипто + {len(STOCK_TICKERS)} акций/сырья")
     print(f"🚨 Порог: {ALERT_THRESHOLD_CRYPTO}% (крипта), {ALERT_THRESHOLD_STOCKS}% (акции)")
-    print(f"️ Минимум между сигналами: {MINUTES_BETWEEN_ALERTS} минут")
     
-    # Проверяем, не было ли недавнего сигнала
+    # Проверяем последний сигнал
     if check_last_alert():
         print("✅ Проверка завершена (сигнал не отправлен).")
         return
@@ -327,11 +434,19 @@ def main():
     if alerts:
         print(f"🚨 Обнаружено {len(alerts)} резких движений!")
         
-        # Генерируем один график для всех
+        # Собираем новости
+        print("📰 Сбор новостей (геополитика + IT + финансы)...")
+        news_data = get_all_news()
+        
+        # Анализируем причины через ИИ
+        print("🧠 ИИ-анализ причин скачка...")
+        causes_text = analyze_causes_with_ai(alerts, news_data)
+        
+        # Генерируем график
         chart_buffer = generate_alert_chart(alerts)
         
-        # Отправляем объединённый сигнал
-        send_alert(alerts, chart_buffer)
+        # Отправляем сигнал
+        send_alert(alerts, chart_buffer, causes_text)
     else:
         print("✅ Резких движений не обнаружено. Молчим.")
     
