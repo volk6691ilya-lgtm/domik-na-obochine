@@ -221,7 +221,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
         fg_emoji = "🟢"
         fg_signal = "ЖАДНОСТЬ"
     else:
-        fg_emoji = "🔴"
+        fg_emoji = ""
         fg_signal = "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
     
     prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков. Создай ОБЪЕКТИВНЫЙ обзор рынка для Telegram-канала.
@@ -240,7 +240,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [РЫНКИ]: {finance}
 [НОВОСТИ]: {news}
 
-️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
+⚠️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
 1. НЕ используй символы ## (заголовки Markdown)
 2. НЕ используй символ > (цитаты)
 3. НЕ используй --- (разделители)
@@ -255,16 +255,16 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 
 📈 ПЕРИОД АНАЛИЗА: {session_info['period']}
 
-⚠️ Сначала риски, потом возможности!
+️ Сначала риски, потом возможности!
 
-🪙 1. КРИПТОРЫНОК
+ 1. КРИПТОРЫНОК
 - BTC, ETH, SOL, XRP: цены, объёмы, изменения за период
 - Уровни поддержки/сопротивления BTC
 - Доминация BTC: {btc_dom:.1f}% — что это значит
 - Общая капитализация: ${total_mcap:.0f}B
 - Анализ: что происходит и почему
 
-🛢️ 2. СЫРЬЁ
+️ 2. СЫРЬЁ
 - Золото, Серебро, Нефть Brent: цены и изменения из блока [РЫНКИ]
 - Связь с инфляцией и риск-аппетитом
 - Анализ: куда движутся "умные деньги"
@@ -274,7 +274,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Индекс страха/жадности: {fg_value}/100 ({fg_class})
 - Анализ: риск-он или риск-офф?
 
- 4. ГЕОПОЛИТИКА
+🌐 4. ГЕОПОЛИТИКА
 - Новости из блока [НОВОСТИ] (регуляция, законы, санкции)
 - СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ [текст](url) — НЕ ПЕРЕПИСЫВАЙ ЗАГОЛОВКИ!
 - Временные метки [X ч. назад]
@@ -285,16 +285,16 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Новости про ETF, биржи, институционалов
 - Анализ: куда движется "умный капитал"
 
- СВЯЗЬ ВЕТОК:
+🔗 СВЯЗЬ ВЕТОК:
 - Как геополитика/IT влияют на крипту
 - Комплексный вывод: что это значит для рынка
 
 🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
 1️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
-2️ [Конкретное действие]: [Пояснение с процентами и уровнями]
-3️ [Конкретное действие]: [Пояснение с процентами и уровнями]
+2️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
+3️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 
- QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):
+⚡ QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):
 Используй цветовую кодировку:
 - 🟢 зелёный = рост/бычий сигнал
 - 🔴 красный = падение/медвежий сигнал
@@ -319,7 +319,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
 
 ⚖️ ДИСКЛЕЙМЕР (ТОЧНЫЙ ТЕКСТ, НЕ СОКРАЩАТЬ!):
-"⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль."
+"️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль."
 
 ПРАВИЛА СТИЛЯ:
 - Тон: профессиональный, но живой (не сухой)
@@ -377,62 +377,27 @@ def get_post_footer(session_info):
 🔔 ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику. При резких изменениях в канал придёт экстренный сигнал.
 
- Если обзор был полезен — ставь реакцию!
- Подписывайся на канал, чтобы не пропустить важные сигналы."""
+👍 Если обзор был полезен — ставь реакцию!
+📢 Подписывайся на канал, чтобы не пропустить важные сигналы."""
     
     return footer
 
 # ==========================================
-# 5. ОТПРАВКА В TELEGRAM
+# 5. УМНОЕ РАЗДЕЛЕНИЕ НА ЧАСТИ
 # ==========================================
-def send_to_telegram(text, fear_greed=None):
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
-    
-    # Генерируем умную обложку (красивая картинка, не дашборд)
-    seed = random.randint(1, 99999)
-    
-    fg_value = fear_greed[0] if fear_greed and fear_greed[0] else 50
-    if fg_value <= 24:
-        color_theme = "red dark dramatic crash falling"
-        effect = "chaos panic"
-    elif fg_value <= 49:
-        color_theme = "orange dark moody"
-        effect = "shadow uncertainty"
-    elif fg_value <= 51:
-        color_theme = "gray neutral foggy"
-        effect = "mist fog"
-    elif fg_value <= 74:
-        color_theme = "green dark bullish"
-        effect = "growth rising"
-    else:
-        color_theme = "bright green neon"
-        effect = "breakout new highs"
-    
-    image_url = f"https://image.pollinations.ai/prompt/cyberpunk%20financial%20market%20data%20{color_theme}%20{effect}%20glowing%20charts%20dark%20background?width=1200&height=600&nologo=true&seed={seed}"
-    
-    caption = "📊 ИИ АНАЛИТИК НА СВЯЗИ\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
-    
-    photo_payload = {
-        "chat_id": channel_id,
-        "photo": image_url,
-        "caption": caption,
-        "parse_mode": "Markdown"
-    }
-    requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
-    time.sleep(2)
-    
-    # Отправляем текст (умная нарезка)
-    max_len = 4000
+def smart_split_text(text, max_len=4000):
+    """Умное разделение текста на части без разрыва логических блоков"""
     paragraphs = text.split('\n\n')
     parts = []
     current_part = ""
     
     for para in paragraphs:
+        # Если абзац сам по себе больше максимума
         if len(para) > max_len:
             if current_part:
                 parts.append(current_part.strip())
                 current_part = ""
+            # Делим большой абзац по предложениям
             sentences = para.split('. ')
             temp_part = ""
             for sentence in sentences:
@@ -444,8 +409,10 @@ def send_to_telegram(text, fear_greed=None):
                     temp_part = sentence + ". "
             if temp_part:
                 current_part = temp_part
+        # Если абзац влезает в текущую часть
         elif len(current_part) + len(para) + 2 <= max_len:
             current_part += para + "\n\n"
+        # Если не влезает — начинаем новую часть
         else:
             if current_part:
                 parts.append(current_part.strip())
@@ -454,19 +421,72 @@ def send_to_telegram(text, fear_greed=None):
     if current_part:
         parts.append(current_part.strip())
     
+    return parts
+
+# ==========================================
+# 6. ОТПРАВКА В TELEGRAM
+# ==========================================
+def send_to_telegram(text, fear_greed=None):
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
+    
+    # Генерируем картинку с графиками (как на мониторе трейдера)
+    seed = random.randint(1, 99999)
+    
+    fg_value = fear_greed[0] if fear_greed and fear_greed[0] else 50
+    if fg_value <= 24:
+        # Паника — красные графики с падением
+        chart_style = "red charts falling crash"
+        screen_theme = "dark red theme"
+    elif fg_value <= 49:
+        # Страх — оранжевые/жёлтые графики
+        chart_style = "orange yellow charts declining"
+        screen_theme = "dark moody theme"
+    elif fg_value <= 51:
+        # Нейтрально — спокойные графики
+        chart_style = "neutral charts sideways"
+        screen_theme = "dark theme"
+    elif fg_value <= 74:
+        # Жадность — зелёные растущие графики
+        chart_style = "green charts rising bullish"
+        screen_theme = "dark green theme"
+    else:
+        # Экстремальная жадность — ярко-зелёные
+        chart_style = "bright green charts breakout new highs"
+        screen_theme = "dark neon theme"
+    
+    image_url = f"https://image.pollinations.ai/prompt/professional%20trading%20monitor%20screen%20with%20multiple%20charts%20{chart_style}%20candlestick%20charts%20crypto%20bitcoin%20ethereum%20stocks%20commodities%20gold%20oil%20{screen_theme}%20financial%20data%20visualization%20realistic%20trading%20terminal?width=1200&height=600&nologo=true&seed={seed}"
+    
+    caption = "📊 ИИ АНАЛИТИК НА СВЯЗИ\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+    
+    photo_payload = {
+        "chat_id": channel_id,
+        "photo": image_url,
+        "caption": caption,
+        "parse_mode": "Markdown"
+    }
+    response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
+    if response.status_code != 200:
+        print(f"⚠️ Ошибка отправки картинки: {response.text}")
+    time.sleep(2)
+    
+    # Умное разделение текста на части
+    parts = smart_split_text(text, max_len=4000)
     total_parts = len(parts)
     
     for i, part in enumerate(parts):
         if i > 0:
             time.sleep(3)
         
+        # Добавляем индикатор части
         if total_parts > 1:
             header = f"📄 **ЧАСТЬ {i+1}/{total_parts}**\n\n"
-            footer = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
-            part_with_indicator = header + part + footer
+            footer_text = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
+            part_with_indicator = header + part + footer_text
         else:
             part_with_indicator = part
         
+        # Обрезаем если всё ещё слишком длинно
         if len(part_with_indicator) > 4090:
             part_with_indicator = part_with_indicator[:4080] + "\n\n_...текст обрезан_"
         
@@ -483,12 +503,12 @@ def send_to_telegram(text, fear_greed=None):
             print(f"❌ Ошибка части {i+1}: {response.text}")
 
 # ==========================================
-# 6. ГЛАВНЫЙ ЗАПУСК
+# 7. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print(" Запуск ИИ Аналитика v26.0 (5 веток)...")
+    print("🚀 Запуск ИИ Аналитика v27.0 (5 веток + умное разбиение)...")
     
-    print("📡 Определение типа выпуска...")
+    print(" Определение типа выпуска...")
     session_info = get_session_info()
     print(f"   Тип: {session_info['name']} выпуск")
     print(f"   Период: {session_info['period']}")
@@ -501,7 +521,7 @@ def main():
     finance = get_finance_data()
     news = get_news_data()
     
-    print(" ИИ-анализ (30-60 секунд)...")
+    print("🧠 ИИ-анализ (30-60 секунд)...")
     try:
         analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
     except Exception as e:
