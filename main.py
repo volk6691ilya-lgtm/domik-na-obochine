@@ -417,19 +417,27 @@ def smart_split_text(text, max_len=4000):
 # 🔧 ДОБАВЛЯЙ СЮДА СВОИ ССЫЛКИ НА КАРТИНКИ!
 COVER_IMAGES = {
     'bullish': [  # Для роста/позитива
-        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1621506289937-a8e6df2577ab?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1639762681485-074b9f78399c?w=1200&h=600&fit=crop",
+        "https://yaart-web-alice-images.s3.yandex.net/84c52bf6aa3a11f189602606a5d7bc8c:1",
+        "https://yaart-web-alice-images.s3.yandex.net/a17ebc4faa3a11f1b32b2e01b35d2537:1",
+        "https://yaart-web-alice-images.s3.yandex.net/bbc0dc8caa3a11f1b5f7dac8d6e9694f:1",
+        "https://yaart-web-alice-images.s3.yandex.net/d21cae2faa3a11f1a0e4e6699db90df6:1",
+        "https://yaart-web-alice-images.s3.yandex.net/186c5862aa3b11f19e7226b1e90a609c:1",
         # Добавь сюда свои ссылки на картинки для бычьего рынка
     ],
     'bearish': [  # Для падения/негатива
-        "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1559526324-4b2ff7614b2f?w=1200&h=600&fit=crop",
+        "",
+        "",
+        "",
+        "",
+        "",
         # Добавь сюда свои ссылки на картинки для медвежьего рынка
     ],
     'neutral': [  # Для нейтрального/боковика
-        "https://images.unsplash.com/photo-1518186285589-2f18bd471d64?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
+        "",
+        "",
+        "",
+        "",
+        "",
         # Добавь сюда свои ссылки на картинки для нейтрального рынка
     ]
 }
