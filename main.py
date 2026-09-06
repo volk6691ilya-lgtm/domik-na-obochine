@@ -437,17 +437,24 @@ def send_to_telegram(text, chart_buffer=None):
     # Отправляем дашборд
     if chart_buffer:
         print("📊 Отправка дашборда...")
-        photo_payload = {
-            "chat_id": channel_id,
-            "photo": chart_buffer,
-            "caption": " ПОЖАРНЫЙ ШПИОН: РЫНОЧНЫЙ ДАШБОРД (12 ЧАСОВ)\n\nГрафики подтверждают анализ ниже 👇",
-            "parse_mode": "Markdown"
-        }
-        response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", data=photo_payload, timeout=30)
-        if response.status_code == 200:
-            print("✅ Дашборд отправлен!")
-        else:
-            print(f"️ Ошибка отправки дашборда: {response.text}")
+        try:
+            files = {
+                'photo': ('dashboard.png', chart_buffer, 'image/png'),
+                'chat_id': (None, channel_id),
+                'caption': (None, "🔥 ПОЖАРНЫЙ ШПИОН: РЫНОЧНЫЙ ДАШБОРД (12 ЧАСОВ)\n\nГрафики подтверждают анализ ниже "),
+                'parse_mode': (None, 'Markdown')
+            }
+            response = requests.post(
+                f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+                files=files,
+                timeout=30
+            )
+            if response.status_code == 200:
+                print("✅ Дашборд отправлен!")
+            else:
+                print(f"⚠️ Ошибка отправки дашборда: {response.text}")
+        except Exception as e:
+            print(f"⚠️ Ошибка при отправке дашборда: {e}")
         time.sleep(2)
     
     # Отправляем текст (умная нарезка)
