@@ -402,7 +402,8 @@ def send_alert(alerts, chart_buffer, causes_text):
     text_payload = {
         "chat_id": channel_id,
         "text": alert_text,
-        "parse_mode": "Markdown"
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True
     }
     response = requests.post(
         f"https://api.telegram.org/bot{bot_token}/sendMessage",
