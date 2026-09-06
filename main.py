@@ -118,8 +118,8 @@ def get_finance_data():
     except Exception as e:
         return f"• Рынки: Ошибка ({str(e)[:30]})"
 
-def format_time_ago(published_time):
-    """Форматирует время публикации новости относительно текущего момента"""
+def get_hours_ago(published_time):
+    """Возвращает количество часов с момента публикации новости"""
     try:
         msk_tz = timezone(timedelta(hours=3))
         now = datetime.now(msk_tz)
@@ -129,50 +129,75 @@ def format_time_ago(published_time):
         elif isinstance(published_time, datetime):
             pub_dt = published_time
         else:
-            return ""
+            return None
         
         if pub_dt.tzinfo is None:
             pub_dt = pub_dt.replace(tzinfo=timezone.utc).astimezone(msk_tz)
         
         diff = now - pub_dt
-        hours = int(diff.total_seconds() / 3600)
-        
-        if hours < 1:
-            return "только что"
-        elif hours < 24:
-            return f"{hours} ч. назад"
-        else:
-            days = hours // 24
-            return f"{days} дн. назад"
+        hours = diff.total_seconds() / 3600
+        return hours
     except:
+        return None
+
+def format_time_ago(hours):
+    """Форматирует количество часов в читаемый вид"""
+    if hours is None:
         return ""
+    if hours < 1:
+        return "только что"
+    elif hours < 24:
+        h = int(hours)
+        return f"{h} ч. назад"
+    else:
+        days = int(hours // 24)
+        return f"{days} дн. назад"
 
 def get_news_data():
-    """Новости из RSS с временными метками и КЛИКАБЕЛЬНЫМИ ссылками"""
+    """Новости из RSS: только за последние 12 часов, со встроенными ссылками"""
     try:
         feeds = [
             "http://feeds.reuters.com/reuters/businessNews",
             "https://cointelegraph.com/rss"
         ]
         headlines = []
+        
         for feed_url in feeds:
             feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:3]:
+            for entry in feed.entries:
+                # Проверяем возраст новости — только до 12 часов
+                hours_ago = get_hours_ago(entry.get('published_parsed'))
+                if hours_ago is None or hours_ago > 12:
+                    continue  # Пропускаем старые новости
+                
                 title = entry.title
                 link = entry.get('link', '')
-                time_ago = format_time_ago(entry.get('published_parsed'))
+                time_label = format_time_ago(hours_ago)
                 
+                # Экранируем спецсимволы Markdown в заголовке
                 title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
                 
-                time_prefix = f"[{time_ago}] " if time_ago else ""
+                # Формат: ссылка встроена в текст, время в начале
+                time_prefix = f"[{time_label}] " if time_label else ""
                 
                 if link:
-                    headlines.append(f"• {time_prefix}[{title_safe}]({link})")
+                    # Ссылка встроена в текст новости
+                    headlines.append(f"• {time_prefix}{title_safe} — [источник]({link})")
                 else:
                     headlines.append(f"• {time_prefix}{title_safe}")
-        return "\n".join(headlines[:5])
+                
+                # Берём максимум 5 свежих новостей
+                if len(headlines) >= 5:
+                    break
+            if len(headlines) >= 5:
+                break
+        
+        if not headlines:
+            return "• Новостей за последние 12 часов не обнаружено — фон спокойный"
+        
+        return "\n".join(headlines)
     except Exception as e:
-        return "• Новости: Ошибка сбора данных"
+        return f"• Новости: Ошибка сбора данных ({str(e)[:30]})"
 
 # ==========================================
 # 3. ИИ-АНАЛИЗ (OPENROUTER) С УЧЕТОМ СЕССИИ
@@ -192,19 +217,19 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     total_mcap = global_data['total_market_cap']
     
     if fg_value <= 24:
-        fg_emoji = ""
+        fg_emoji = "🔴"
         fg_signal = "ПАНИКА — возможны покупки на дне"
     elif fg_value <= 49:
-        fg_emoji = ""
+        fg_emoji = "🟠"
         fg_signal = "СТРАХ — рынок осторожничает"
     elif fg_value <= 51:
-        fg_emoji = ""
+        fg_emoji = "🟡"
         fg_signal = "НЕЙТРАЛЬНО — неопределенность"
     elif fg_value <= 74:
         fg_emoji = ""
         fg_signal = "ЖАДНОСТЬ — осторожно с FOMO"
     else:
-        fg_emoji = ""
+        fg_emoji = "🔴"
         fg_signal = "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ — высокая вероятность коррекции"
     
     prompt = f"""Ты — «Пожарный Шпион», элитный автономный ИИ-аналитик. Создай ПРОФЕССИОНАЛЬНЫЙ обзор рынка для Telegram-канала.
@@ -223,7 +248,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [КРИПТА С ОБЪЕМАМИ]: {crypto}
 [УРОВНИ BTC]: {support_resistance}
 [ТРАДИЦИОННЫЕ РЫНКИ]: {finance}
-[НОВОСТИ С ВРЕМЕНЕМ И ССЫЛКАМИ]: {news}
+[НОВОСТИ ЗА 12 ЧАСОВ]: {news}
 
 СТРОГАЯ СТРУКТУРА (НЕ ПРОПУСКАЙ НИ ОДИН БЛОК):
 
@@ -238,7 +263,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Расшифровка: 0-24=Extreme Fear, 25-49=Fear, 50=Neutral, 51-74=Greed, 75-100=Extreme Greed
 - Ключевые движения BTC и ETH за АНАЛИЗИРУЕМЫЙ ПЕРИОД
 
- УРОВНИ BTC:
+🎯 УРОВНИ BTC:
 - Поддержка: [из данных]
 - Сопротивление: [из данных]
 - Текущая цена: [из данных]
@@ -249,8 +274,8 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Институциональная активность
 
 📰 ГЛАВНЫЕ НОВОСТИ:
-- 2-3 новости из блока [НОВОСТИ С ВРЕМЕНЕМ И ССЫЛКАМИ]
-- СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ В ФОРМАТЕ [текст](url) — НЕ УДАЛЯЙ ИХ!
+- 2-3 новости из блока [НОВОСТИ ЗА 12 ЧАСОВ]
+- СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ В ФОРМАТЕ [источник](url) — НЕ УДАЛЯЙ ИХ!
 - Сохрани временные метки [X ч. назад] из исходных данных
 - Влияние на рынок (1 предложение)
 
@@ -258,9 +283,9 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит."
 
 🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
-1️ [Конкретное действие]: [Пояснение с процентами]
+1️⃣ [Конкретное действие]: [Пояснение с процентами]
 2️⃣ [Конкретное действие]: [Пояснение с процентами]
-3️⃣ [Конкретное действие]: [Пояснение с процентами]
+3️ [Конкретное действие]: [Пояснение с процентами]
 
 ⚡ QUICK STATS (с ЦВЕТОВОЙ КОДИРОВКОЙ):
 Используй эмодзи-цвета для сигналов:
@@ -277,7 +302,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Все активы из входных данных (крипта, сырьё, индексы)
 
 ⚖️ ДИСКЛЕЙМЕР:
-"️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль."
+"⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль."
 
 ВАЖНО: НЕ добавляй в конец информацию о следующем выпуске или призывы подписаться — это добавит система автоматически после твоего текста.
 
@@ -339,13 +364,13 @@ def get_post_footer(session_info):
         next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
     
     footer = f"""
- СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
+⏰ СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
 
-🔔 ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
+ ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику. При резких изменениях, которые могут повлиять на ваши позиции, в канал придёт экстренный сигнал.
 
 👍 Если обзор был полезен — ставь реакцию!
- Подписывайся на канал, чтобы не пропустить важные сигналы."""
+📢 Подписывайся на канал, чтобы не пропустить важные сигналы."""
     
     return footer
 
@@ -356,6 +381,7 @@ def send_to_telegram(text):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
+    # 1. Отправляем обложку
     seed = random.randint(1, 99999)
     image_url = f"https://image.pollinations.ai/prompt/cyberpunk%20financial%20market%20data%20dark%20neon%20glowing%20charts?width=1200&height=600&nologo=true&seed={seed}"
     
@@ -370,6 +396,7 @@ def send_to_telegram(text):
     requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", json=photo_payload, timeout=15)
     time.sleep(2)
     
+    # 2. УМНАЯ НАРЕЗКА
     max_len = 4000
     paragraphs = text.split('\n\n')
     
@@ -402,6 +429,7 @@ def send_to_telegram(text):
     if current_part:
         parts.append(current_part.strip())
     
+    # 3. Отправляем каждую часть
     total_parts = len(parts)
     
     for i, part in enumerate(parts):
@@ -421,7 +449,8 @@ def send_to_telegram(text):
         text_payload = {
             "chat_id": channel_id,
             "text": part_with_indicator,
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True  # ОТКЛЮЧАЕМ РАЗВОРАЧИВАНИЕ ССЫЛОК В КАРТОЧКИ
         }
         response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=text_payload, timeout=15)
         
@@ -434,9 +463,9 @@ def send_to_telegram(text):
 # 6. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🔥 Запуск Пожарного Шпиона v24.0...")
+    print(" Запуск Пожарного Шпиона v24.1...")
     
-    print("📡 Определение типа выпуска...")
+    print(" Определение типа выпуска...")
     session_info = get_session_info()
     print(f"   Тип: {session_info['name']} выпуск")
     print(f"   Период: {session_info['period']}")
@@ -456,11 +485,11 @@ def main():
         print(f"❌ Ошибка ИИ-анализа: {e}")
         analysis = "Ошибка генерации анализа. Попробуйте позже."
     
-    print(" Добавление футера...")
+    print("📎 Добавление футера...")
     footer = get_post_footer(session_info)
     full_text = analysis + "\n\n" + footer
     
-    print(f" Длина текста: {len(full_text)} символов")
+    print(f"📏 Длина текста: {len(full_text)} символов")
     
     print("📤 Публикация...")
     send_to_telegram(full_text)
