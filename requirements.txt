@@ -3,3 +3,4 @@ python-dotenv
 yfinance
 feedparser
 pandas
+matplotlib
