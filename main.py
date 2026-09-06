@@ -490,10 +490,11 @@ def send_to_telegram(text, fear_greed=None):
         if len(part_with_indicator) > 4090:
             part_with_indicator = part_with_indicator[:4080] + "\n\n_...текст обрезан_"
         
-        text_payload = {
+            text_payload = {
             "chat_id": channel_id,
             "text": part_with_indicator,
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
         }
         response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=text_payload, timeout=15)
         
