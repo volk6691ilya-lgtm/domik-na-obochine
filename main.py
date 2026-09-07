@@ -425,19 +425,19 @@ COVER_IMAGES = {
         # Добавь сюда свои ссылки на картинки для бычьего рынка
     ],
     'bearish': [  # Для падения/негатива
-        "",
-        "",
-        "",
-        "",
-        "",
+        "https://yaart-web-alice-images.s3.yandex.net/7b188471aa3b11f1bef846440a659148:1",
+        "https://yaart-web-alice-images.s3.yandex.net/6eb6c211aaa211f1b5f7dac8d6e9694f:1",
+        "https://yaart-web-alice-images.s3.yandex.net/750bd1a2aaa211f1bc4112b3f6efdfff:1",
+        "https://yaart-web-alice-images.s3.yandex.net/7caa55ceaaa211f1be32feeaba1e9874:1",
+        "https://yaart-web-alice-images.s3.yandex.net/84d1ce59aaa211f19b3262569497eb2e:1",
         # Добавь сюда свои ссылки на картинки для медвежьего рынка
     ],
     'neutral': [  # Для нейтрального/боковика
-        "",
-        "",
-        "",
-        "",
-        "",
+        "https://yaart-web-alice-images.s3.yandex.net/9458b2f9aaa311f19c758269b756e6a2:1",
+        "https://yaart-web-alice-images.s3.yandex.net/ff4c2037aaa211f19524cab78a9f2435:1",
+        "https://yaart-web-alice-images.s3.yandex.net/0a11221faaa311f186183e016d706d26:1",
+        "https://yaart-web-alice-images.s3.yandex.net/1b3103d5aaa311f1a8822a8d039f1a15:1",
+        "https://yaart-web-alice-images.s3.yandex.net/2782133baaa311f1a4cd0e1c070e87ca:1",
         # Добавь сюда свои ссылки на картинки для нейтрального рынка
     ]
 }
