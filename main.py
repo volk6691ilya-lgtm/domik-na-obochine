@@ -200,22 +200,22 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     if fg_value is None:
         fg_value = 50
         fg_class = "Neutral"
-        fg_emoji = "🟡"
+        fg_emoji = "😐"
         fg_signal = "НЕЙТРАЛЬНО"
     elif fg_value <= 24:
-        fg_emoji = "🔴"
+        fg_emoji = "😰"
         fg_signal = "ПАНИКА"
     elif fg_value <= 49:
-        fg_emoji = "🟠"
+        fg_emoji = ""
         fg_signal = "СТРАХ"
     elif fg_value <= 51:
-        fg_emoji = ""
+        fg_emoji = "😐"
         fg_signal = "НЕЙТРАЛЬНО"
     elif fg_value <= 74:
-        fg_emoji = "🟢"
+        fg_emoji = "😊"
         fg_signal = "ЖАДНОСТЬ"
     else:
-        fg_emoji = ""
+        fg_emoji = "🤑"
         fg_signal = "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
     
     prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков. Создай ОБЪЕКТИВНЫЙ обзор рынка для Telegram-канала.
@@ -242,63 +242,64 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 5. Используй ТОЛЬКО: обычный текст, **жирный шрифт**, эмодзи для структуры
 6. Сохраняй КЛИКАБЕЛЬНЫЕ ССЫЛКИ в новостях в формате [текст](url) — НЕ УДАЛЯЙ ИХ!
 7. НЕ сокращай блоки — пиши каждый раздел полноценно
+8. Используй красивые финансовые эмодзи из списка ниже
 
 СТРУКТУРА ПОСТА (ВСЕ БЛОКИ ОБЯЗАТЕЛЬНЫ):
 
-📊 ИИ АНАЛИТИК: {session_info['name']} ОБЗОР — {session_info['date']}
+📊 **ИИ АНАЛИТИК: {session_info['name']} ОБЗОР** — {session_info['date']}
 
-📈 ПЕРИОД АНАЛИЗА: {session_info['period']}
+📈 **ПЕРИОД АНАЛИЗА:** {session_info['period']}
 
 ⚠️ Сначала риски, потом возможности!
 
-🪙 1. КРИПТОРЫНОК
+🪙 **1. КРИПТОРЫНОК**
 - BTC, ETH, SOL, XRP: цены, объёмы, изменения за период
 - Уровни поддержки/сопротивления BTC
 - Доминация BTC: {btc_dom:.1f}% — что это значит
 - Общая капитализация: ${total_mcap:.0f}B
 - Анализ: что происходит и почему
 
-🛢️ 2. СЫРЬЁ
+️⛏️ **2. СЫРЬЁ**
 - Золото, Серебро, Нефть Brent: цены и изменения из блока [РЫНКИ]
 - Связь с инфляцией и риск-аппетитом
 - Анализ: куда движутся "умные деньги"
 
-🌍 3. МАКРО-ФОН
+🌍📊 **3. МАКРО-ФОН**
 - S&P 500, DXY (индекс доллара): цены и изменения из блока [РЫНКИ]
 - Индекс страха/жадности: {fg_value}/100 ({fg_class})
 - Анализ: риск-он или риск-офф?
 
-🌐 4. ГЕОПОЛИТИКА
+🌐📰 **4. ГЕОПОЛИТИКА**
 - Новости из блока [НОВОСТИ] (регуляция, законы, санкции)
 - СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ [текст](url) — НЕ ПЕРЕПИСЫВАЙ ЗАГОЛОВКИ!
 - Временные метки [X ч. назад]
 - Влияние на рынки
 
-💻 5. IT И ТЕХНОЛОГИИ
+💻🖥️ **5. IT И ТЕХНОЛОГИИ**
 - NVIDIA: цена и изменение из блока [РЫНКИ]
 - Новости про ETF, биржи, институционалов
 - Анализ: куда движется "умный капитал"
 
-🔗 СВЯЗЬ ВЕТОК:
+🔗🧩 **СВЯЗЬ ВЕТОК:**
 - Как геополитика/IT влияют на крипту
 - Комплексный вывод: что это значит для рынка
 
-🎯 ТОРГОВЫЕ ИДЕИ (3 совета):
-1️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
+🎯💡 **ТОРГОВЫЕ ИДЕИ (3 совета):**
+1️ [Конкретное действие]: [Пояснение с процентами и уровнями]
 2️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 3️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 
-⚡ QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):
+📊⚡ **QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):**
 Используй цветовую кодировку:
 - 🟢 зелёный = рост/бычий сигнал
-- 🔴 красный = падение/медвежий сигнал
+-  красный = падение/медвежий сигнал
 - 🟡 жёлтый = предупреждение/нейтрально
 - 🔵 синий = факт/объём
 
 Включи ВСЕ эти метрики:
 - 🔵 BTC: [цена] ([изменение]%) — [комментарий]
 - 🟢 ETH: [цена] ([изменение]%) — [комментарий]
--  SOL: [цена] ([изменение]%) — [комментарий]
+- 🔵 SOL: [цена] ([изменение]%) — [комментарий]
 - 🔵 XRP: [цена] ([изменение]%) — [комментарий]
 - 🟡 Индекс страха/жадности: {fg_value}/100 — [комментарий]
 - 🔵 Доминация BTC: {btc_dom:.1f}% — [комментарий]
@@ -309,10 +310,10 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - [цвет] NVIDIA: [из данных] — [комментарий]
 - [цвет] DXY: [из данных] — [комментарий]
 
-⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:
+⚠️🛑 **РИСК-ПРЕДУПРЕЖДЕНИЕ:**
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
 
-⚖️ ДИСКЛЕЙМЕР (ТОЧНЫЙ ТЕКСТ, НЕ СОКРАЩАТЬ!):
+⚖️📜 **ДИСКЛЕЙМЕР (ТОЧНЫЙ ТЕКСТ, НЕ СОКРАЩАТЬ!):**
 "⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль."
 
 ПРАВИЛА СТИЛЯ:
@@ -321,6 +322,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Конкретные цифры и проценты
 - БЕЗ ВОДЫ: каждое предложение должно нести информацию
 - Объём: 3500-4000 символов (подробно, но без повторов)
+- Используй эмодзи: 📊📉💹💰💵🎯🌐💻️🛑⚠️🔍💡🔔
 - НЕ добавляй информацию о следующем выпуске — система добавит автоматически
 
 ПРИСТУПАЙ!"""
@@ -365,9 +367,9 @@ def get_post_footer(session_info):
         next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
     
     footer = f"""
-⏰ СЛЕДУЮЩИЙ ВЫПУСК: {next_type} обзор в {next_time} МСК ({next_date})
+🔔 **СЛЕДУЮЩИЙ ВЫПУСК:** {next_type} обзор в {next_time} МСК ({next_date})
 
- ПОЖАРНЫЙ ШПИОН — система экстренных оповещений
+🔔🚨 **ПОЖАРНЫЙ ШПИОН** — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику. При резких изменениях в канал придёт экстренный сигнал.
 
 👍 Если обзор был полезен — ставь реакцию!
@@ -414,31 +416,19 @@ def smart_split_text(text, max_len=4000):
 # ==========================================
 # 6. ТВОЯ КОЛЛЕКЦИЯ КАРТИНОК
 # ==========================================
-# 🔧 ДОБАВЛЯЙ СЮДА СВОИ ССЫЛКИ НА КАРТИНКИ!
 COVER_IMAGES = {
-    'bullish': [  # Для роста/позитива
-        "https://yaart-web-alice-images.s3.yandex.net/84c52bf6aa3a11f189602606a5d7bc8c:1",
-        "https://yaart-web-alice-images.s3.yandex.net/a17ebc4faa3a11f1b32b2e01b35d2537:1",
-        "https://yaart-web-alice-images.s3.yandex.net/bbc0dc8caa3a11f1b5f7dac8d6e9694f:1",
-        "https://yaart-web-alice-images.s3.yandex.net/d21cae2faa3a11f1a0e4e6699db90df6:1",
-        "https://yaart-web-alice-images.s3.yandex.net/186c5862aa3b11f19e7226b1e90a609c:1",
-        # Добавь сюда свои ссылки на картинки для бычьего рынка
+    'bullish': [
+        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1621506289937-a8e6df2577ab?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1639762681485-074b9f78399c?w=1200&h=600&fit=crop",
     ],
-    'bearish': [  # Для падения/негатива
-        "https://yaart-web-alice-images.s3.yandex.net/7b188471aa3b11f1bef846440a659148:1",
-        "https://yaart-web-alice-images.s3.yandex.net/6eb6c211aaa211f1b5f7dac8d6e9694f:1",
-        "https://yaart-web-alice-images.s3.yandex.net/750bd1a2aaa211f1bc4112b3f6efdfff:1",
-        "https://yaart-web-alice-images.s3.yandex.net/7caa55ceaaa211f1be32feeaba1e9874:1",
-        "https://yaart-web-alice-images.s3.yandex.net/84d1ce59aaa211f19b3262569497eb2e:1",
-        # Добавь сюда свои ссылки на картинки для медвежьего рынка
+    'bearish': [
+        "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1559526324-4b2ff7614b2f?w=1200&h=600&fit=crop",
     ],
-    'neutral': [  # Для нейтрального/боковика
-        "https://yaart-web-alice-images.s3.yandex.net/9458b2f9aaa311f19c758269b756e6a2:1",
-        "https://yaart-web-alice-images.s3.yandex.net/ff4c2037aaa211f19524cab78a9f2435:1",
-        "https://yaart-web-alice-images.s3.yandex.net/0a11221faaa311f186183e016d706d26:1",
-        "https://yaart-web-alice-images.s3.yandex.net/1b3103d5aaa311f1a8822a8d039f1a15:1",
-        "https://yaart-web-alice-images.s3.yandex.net/2782133baaa311f1a4cd0e1c070e87ca:1",
-        # Добавь сюда свои ссылки на картинки для нейтрального рынка
+    'neutral': [
+        "https://images.unsplash.com/photo-1518186285589-2f18bd471d64?w=1200&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
     ]
 }
 
@@ -446,19 +436,16 @@ def get_cover_image(fear_greed):
     """Выбирает картинку из твоей коллекции на основе настроения рынка"""
     fg_value = fear_greed[0] if fear_greed and fear_greed[0] else 50
     
-    # Определяем настроение рынка
     if fg_value <= 30:
-        mood = 'bearish'  # Страх/паника
+        mood = 'bearish'
     elif fg_value >= 70:
-        mood = 'bullish'  # Жадность/эйфория
+        mood = 'bullish'
     else:
-        mood = 'neutral'  # Нейтрально
+        mood = 'neutral'
     
-    # Выбираем случайную картинку из соответствующей категории
     if COVER_IMAGES.get(mood):
         image_url = random.choice(COVER_IMAGES[mood])
     else:
-        # Если категория пустая — берём из любой
         all_images = []
         for images in COVER_IMAGES.values():
             all_images.extend(images)
@@ -468,7 +455,6 @@ def get_cover_image(fear_greed):
         print("⚠️ Нет картинок в коллекции!")
         return None
     
-    # Скачиваем картинку
     try:
         print(f"🎨 Скачивание картинки (настроение: {mood})...")
         response = requests.get(image_url, timeout=30)
@@ -476,7 +462,7 @@ def get_cover_image(fear_greed):
             print("✅ Картинка скачана успешно")
             return BytesIO(response.content)
         else:
-            print(f"️ Ошибка скачивания: статус {response.status_code}")
+            print(f"⚠️ Ошибка скачивания: статус {response.status_code}")
             return None
     except Exception as e:
         print(f"⚠️ Ошибка при скачивании: {e}")
@@ -493,13 +479,12 @@ def send_to_telegram(text, fear_greed=None):
         print("❌ Ошибка: TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID не установлены")
         return
     
-    # Получаем картинку из коллекции
-    print("🎨 Выбор картинки из коллекции...")
+    print(" Выбор картинки из коллекции...")
     image_buffer = get_cover_image(fear_greed)
     
     if image_buffer:
         print("📤 Отправка картинки...")
-        caption = "📊 ИИ АНАЛИТИК НА СВЯЗИ\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+        caption = "💼 **ИИ АНАЛИТИК НА СВЯЗИ**\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
         
         files = {
             'photo': ('cover.jpg', image_buffer, 'image/jpeg'),
@@ -517,16 +502,15 @@ def send_to_telegram(text, fear_greed=None):
         if response.status_code == 200:
             print("✅ Картинка отправлена!")
         else:
-            print(f"⚠️ Ошибка отправки картинки: {response.text}")
+            print(f"️ Ошибка отправки картинки: {response.text}")
         time.sleep(2)
     else:
         print("⚠️ Картинка не получена, отправляем только текст")
     
-    # Умное разделение текста на части
     parts = smart_split_text(text, max_len=4000)
     total_parts = len(parts)
     
-    print(f" Отправка {total_parts} частей...")
+    print(f"📤 Отправка {total_parts} частей...")
     
     for i, part in enumerate(parts):
         if i > 0:
@@ -564,7 +548,7 @@ def send_to_telegram(text, fear_greed=None):
 # 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v29.0 (5 веток + твоя коллекция картинок)...")
+    print("🚀 Запуск ИИ Аналитика v30.0 (5 веток + красивые эмодзи)...")
     
     print(" Определение типа выпуска...")
     session_info = get_session_info()
@@ -583,7 +567,7 @@ def main():
     try:
         analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
     except Exception as e:
-        print(f" Ошибка ИИ-анализа: {e}")
+        print(f"❌ Ошибка ИИ-анализа: {e}")
         analysis = "Ошибка генерации анализа."
     
     print("📎 Добавление футера...")
