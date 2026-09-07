@@ -418,17 +418,25 @@ def smart_split_text(text, max_len=4000):
 # ==========================================
 COVER_IMAGES = {
     'bullish': [
-        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1621506289937-a8e6df2577ab?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1639762681485-074b9f78399c?w=1200&h=600&fit=crop",
+        "https://yaart-web-alice-images.s3.yandex.net/bbc0dc8caa3a11f1b5f7dac8d6e9694f:1",
+        "https://yaart-web-alice-images.s3.yandex.net/f6fd8dd9aa3a11f1be4ff64837c935dc:1",
+        "https://yaart-web-alice-images.s3.yandex.net/fe763ff0aa3a11f19e7226b1e90a609c:1",
+        "https://yaart-web-alice-images.s3.yandex.net/0dde9fbdaa3b11f1a597a2461469a89e:1",
+        "https://yaart-web-alice-images.s3.yandex.net/186c5862aa3b11f19e7226b1e90a609c:1",
     ],
     'bearish': [
-        "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1559526324-4b2ff7614b2f?w=1200&h=600&fit=crop",
+        "https://yaart-web-alice-images.s3.yandex.net/84d1ce59aaa211f19b3262569497eb2e:1",
+        "https://yaart-web-alice-images.s3.yandex.net/7caa55ceaaa211f1be32feeaba1e9874:1",
+        "https://yaart-web-alice-images.s3.yandex.net/750bd1a2aaa211f1bc4112b3f6efdfff:1",
+        "https://yaart-web-alice-images.s3.yandex.net/6eb6c211aaa211f1b5f7dac8d6e9694f:1",
+        "https://yaart-web-alice-images.s3.yandex.net/7b188471aa3b11f1bef846440a659148:1",
     ],
     'neutral': [
-        "https://images.unsplash.com/photo-1518186285589-2f18bd471d64?w=1200&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1611974789855-9c2a0b0a3b0c?w=1200&h=600&fit=crop",
+        "https://yaart-web-alice-images.s3.yandex.net/9458b2f9aaa311f19c758269b756e6a2:1",
+        "https://yaart-web-alice-images.s3.yandex.net/2782133baaa311f1a4cd0e1c070e87ca:1",
+        "https://yaart-web-alice-images.s3.yandex.net/1b3103d5aaa311f1a8822a8d039f1a15:1",
+        "https://yaart-web-alice-images.s3.yandex.net/0a11221faaa311f186183e016d706d26:1",
+        "https://yaart-web-alice-images.s3.yandex.net/ff4c2037aaa211f19524cab78a9f2435:1",
     ]
 }
 
