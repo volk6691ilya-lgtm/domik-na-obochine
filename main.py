@@ -465,15 +465,25 @@ def get_cover_image(fear_greed):
     
     try:
         print(f"🎨 Скачивание картинки (настроение: {mood})...")
-        response = requests.get(image_url, timeout=30)
+        print(f"🔗 URL: {image_url}")
+        
+        # 🔥 ДОБАВЛЕНО: Маскировка под обычный браузер, чтобы Яндекс не блокировал
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        }
+        
+        response = requests.get(image_url, headers=headers, timeout=30)
+        
         if response.status_code == 200 and len(response.content) > 1000:
-            print("✅ Картинка скачана успешно")
+            print(f"✅ Картинка скачана успешно (размер: {len(response.content)} байт)")
             return BytesIO(response.content)
         else:
             print(f"⚠️ Ошибка скачивания: статус {response.status_code}")
+            print(f"📝 Ответ сервера: {response.text[:200]}")  # Покажем начало ошибки для отладки
             return None
     except Exception as e:
-        print(f"⚠️ Ошибка при скачивании: {e}")
+        print(f"⚠️ Критическая ошибка при скачивании: {e}")
         return None
 
 # ==========================================
@@ -487,7 +497,7 @@ def send_to_telegram(text, fear_greed=None):
         print("❌ Ошибка: TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID не установлены")
         return
     
-    print(" Выбор картинки из коллекции...")
+    print("🖼️ Выбор картинки из коллекции...")
     image_buffer = get_cover_image(fear_greed)
     
     if image_buffer:
@@ -508,17 +518,33 @@ def send_to_telegram(text, fear_greed=None):
         )
         
         if response.status_code == 200:
-            print("✅ Картинка отправлена!")
+            print("✅ Картинка успешно отправлена в Telegram!")
         else:
-            print(f"️ Ошибка отправки картинки: {response.text}")
+            print(f"❌ Ошибка отправки картинки: {response.text}")
+            # Если картинка не ушла, попробуем отправить хотя бы текстовый заголовок
+            text_payload = {
+                "chat_id": channel_id,
+                "text": caption,
+                "parse_mode": "Markdown"
+            }
+            requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=text_payload, timeout=15)
         time.sleep(2)
     else:
-        print("⚠️ Картинка не получена, отправляем только текст")
+        print("⚠️ Картинка не получена, отправляем только текст...")
+        caption = "💼 **ИИ АНАЛИТИК НА СВЯЗИ**\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+        text_payload = {
+            "chat_id": channel_id,
+            "text": caption,
+            "parse_mode": "Markdown"
+        }
+        requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=text_payload, timeout=15)
+        time.sleep(2)
     
+    # Умное разделение текста на части
     parts = smart_split_text(text, max_len=4000)
     total_parts = len(parts)
     
-    print(f"📤 Отправка {total_parts} частей...")
+    print(f"📤 Отправка {total_parts} частей текста...")
     
     for i, part in enumerate(parts):
         if i > 0:
