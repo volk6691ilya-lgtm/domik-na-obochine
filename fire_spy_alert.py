@@ -87,7 +87,7 @@ def check_price_movements():
                     })
                     print(f"🚨 {name}: {change_percent:+.2f}% за час!")
         except Exception as e:
-            print(f"⚠️ Ошибка проверки {name}: {e}")
+            print(f"️ Ошибка проверки {name}: {e}")
     
     for ticker, name in STOCK_TICKERS.items():
         try:
@@ -109,7 +109,7 @@ def check_price_movements():
                     })
                     print(f"🚨 {name}: {change_percent:+.2f}% за час!")
         except Exception as e:
-            print(f"⚠️ Ошибка проверки {name}: {e}")
+            print(f"️ Ошибка проверки {name}: {e}")
     
     return alerts
 
@@ -172,7 +172,6 @@ def analyze_causes_with_ai(alerts, news_data):
         print("⚠️ OPENROUTER_API_KEY не найден, используем простой анализ")
         return format_simple_causes(news_data)
     
-    # Формируем данные для ИИ
     alerts_text = ""
     for alert in alerts:
         direction = "рост" if alert['change'] > 0 else "падение"
@@ -181,9 +180,9 @@ def analyze_causes_with_ai(alerts, news_data):
     news_text = ""
     for category, news_list in news_data.items():
         category_name = {
-            'geopolitics': 'ГЕОПОЛИТИКА',
-            'it_tech': 'IT И ТЕХНОЛОГИИ',
-            'finance': 'ФИНАНСЫ И КРИПТО'
+            'geopolitics': '🌐 ГЕОПОЛИТИКА',
+            'it_tech': '💻 IT И ТЕХНОЛОГИИ',
+            'finance': '📊 ФИНАНСЫ И КРИПТО'
         }.get(category, category)
         
         news_text += f"\n[{category_name}]:\n"
@@ -236,7 +235,7 @@ def analyze_causes_with_ai(alerts, news_data):
             print(f"⚠️ ИИ недоступен (статус {response.status_code}), используем простой анализ")
             return format_simple_causes(news_data)
     except Exception as e:
-        print(f"⚠️ Ошибка ИИ-анализа: {e}")
+        print(f"️ Ошибка ИИ-анализа: {e}")
         return format_simple_causes(news_data)
 
 # ==========================================
@@ -244,13 +243,13 @@ def analyze_causes_with_ai(alerts, news_data):
 # ==========================================
 def format_simple_causes(news_data):
     """Форматирует новости без ИИ-анализа"""
-    causes_text = "🔍 ПОСЛЕДНИЕ НОВОСТИ:\n\n"
+    causes_text = "🔍 **ПОСЛЕДНИЕ НОВОСТИ:**\n\n"
     
     for category, news_list in news_data.items():
         category_name = {
-            'geopolitics': '🌐 ГЕОПОЛИТИКА',
-            'it_tech': ' IT И ТЕХНОЛОГИИ',
-            'finance': '📊 ФИНАНСЫ'
+            'geopolitics': ' ГЕОПОЛИТИКА',
+            'it_tech': '💻 IT И ТЕХНОЛОГИИ',
+            'finance': ' ФИНАНСЫ'
         }.get(category, category)
         
         if news_list:
@@ -284,7 +283,7 @@ def generate_alert_chart(alerts):
         
         if main_alert['change'] > 0:
             color = '#00ff00'
-            title_emoji = ""
+            title_emoji = "📈"
         else:
             color = '#ff0000'
             title_emoji = "📉"
@@ -298,7 +297,7 @@ def generate_alert_chart(alerts):
         change_emoji = "🔴" if main_alert['change'] < 0 else "🟢"
         ax.set_title(
             f'{title_emoji} ПОЖАРНЫЙ ШПИОН: {main_alert["name"]} {change_emoji} {main_alert["change"]:+.2f}%\n'
-            f'Текущая цена: ${current_price:,.2f}',
+            f'💰 Текущая цена: ${current_price:,.2f}',
             color='white',
             fontsize=14,
             fontweight='bold',
@@ -335,47 +334,47 @@ def send_alert(alerts, chart_buffer, causes_text):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
-    # Формируем список алертов
+    # Формируем список алертов с эмодзи
     alerts_text = ""
     for alert in alerts:
-        change_emoji = "" if alert['change'] < 0 else "🟢"
-        alerts_text += f"{change_emoji} **{alert['name']}**: {alert['change']:+.2f}% (цена: ${alert['current_price']:,.2f})\n"
+        change_emoji = "🟢" if alert['change'] > 0 else "🔴"
+        alerts_text += f"{change_emoji} **{alert['name']}**: {alert['change']:+.2f}% (💰 цена: ${alert['current_price']:,.2f})\n"
     
     # Определяем общее направление
     avg_change = sum(a['change'] for a in alerts) / len(alerts)
     
-    # Формируем план действий
+    # Формируем план действий с эмодзи
     if avg_change < 0:
         action_plan = """
-🎯 ЧТО ДЕЛАТЬ:
-• Если в лонге: рассмотрите стоп-лосс ниже текущей цены (-3-5%)
-• Если в шорте: зафиксируйте часть прибыли
-• Если вне рынка: не ловите падающий нож, ждите стабилизации
-• Уменьшите размер позиций до прояснения ситуации
+🎯 **ЧТО ДЕЛАТЬ:**
+• 🔻 Если в лонге: рассмотрите стоп-лосс ниже текущей цены (-3-5%)
+• 🔺 Если в шорте: зафиксируйте часть прибыли
+• ⏸️ Если вне рынка: не ловите падающий нож, ждите стабилизации
+•  Уменьшите размер позиций до прояснения ситуации
 """
     else:
         action_plan = """
-🎯 ЧТО ДЕЛАТЬ:
-• Если в шорте: рассмотрите стоп-лосс выше текущей цены (+3-5%)
-• Если в лонге: зафиксируйте часть прибыли на сопротивлениях
-• Если вне рынка: не входите на хаях, ждите отката
-• Не поддавайтесь FOMO, даже если рынок растёт
+🎯 **ЧТО ДЕЛАТЬ:**
+• 🔺 Если в шорте: рассмотрите стоп-лосс выше текущей цены (+3-5%)
+• 🔻 Если в лонге: зафиксируйте часть прибыли на сопротивлениях
+• ⏸️ Если вне рынка: не входите на хаях, ждите отката
+• 🚫 Не поддавайтесь FOMO, даже если рынок растёт
 """
     
     alert_text = f"""
-🚨 **ПОЖАРНЫЙ ШПИОН: ЭКСТРЕННЫЙ СИГНАЛ**
+🚨 **ПОЖАРНЫЙ ШПИОН: ЭКСТРЕННЫЙ СИГНАЛ** 🚨
 
-Обнаружены резкие движения рынка:
+📊 **Обнаружены резкие движения рынка:**
 
 {alerts_text}
-📊 **ГРАФИК**: см. выше
+📈 **ГРАФИК:** см. выше
 
 {causes_text}
 {action_plan}
-⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ**:
+⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ:**
 Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью.
 
-️ **ДИСКЛЕЙМЕР**:
+️📜 **ДИСКЛЕЙМЕР:**
 ⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль.
 """
     
@@ -385,7 +384,7 @@ def send_alert(alerts, chart_buffer, causes_text):
         files = {
             'photo': ('alert_chart.png', chart_buffer, 'image/png'),
             'chat_id': (None, channel_id),
-            'caption': (None, "🚨 ПОЖАРНЫЙ ШПИОН: Экстренный сигнал"),
+            'caption': (None, "🚨💥 ПОЖАРНЫЙ ШПИОН: Экстренный сигнал"),
             'parse_mode': (None, 'Markdown')
         }
         response = requests.post(
@@ -398,7 +397,7 @@ def send_alert(alerts, chart_buffer, causes_text):
         time.sleep(2)
     
     # Отправляем текст
-    print(" Отправка текста сигнала...")
+    print("📤 Отправка текста сигнала...")
     text_payload = {
         "chat_id": channel_id,
         "text": alert_text,
@@ -420,33 +419,27 @@ def send_alert(alerts, chart_buffer, causes_text):
 # 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚨 Запуск Пожарного Шпиона...")
-    print(f"📡 Мониторинг: {len(CRYPTO_TICKERS)} крипто + {len(STOCK_TICKERS)} акций/сырья")
+    print("🔥 Запуск Пожарного Шпиона...")
+    print(f" Мониторинг: {len(CRYPTO_TICKERS)} крипто + {len(STOCK_TICKERS)} акций/сырья")
     print(f"🚨 Порог: {ALERT_THRESHOLD_CRYPTO}% (крипта), {ALERT_THRESHOLD_STOCKS}% (акции)")
     
-    # Проверяем последний сигнал
     if check_last_alert():
         print("✅ Проверка завершена (сигнал не отправлен).")
         return
     
-    # Проверяем движения
     alerts = check_price_movements()
     
     if alerts:
         print(f"🚨 Обнаружено {len(alerts)} резких движений!")
         
-        # Собираем новости
         print("📰 Сбор новостей (геополитика + IT + финансы)...")
         news_data = get_all_news()
         
-        # Анализируем причины через ИИ
         print("🧠 ИИ-анализ причин скачка...")
         causes_text = analyze_causes_with_ai(alerts, news_data)
         
-        # Генерируем график
         chart_buffer = generate_alert_chart(alerts)
         
-        # Отправляем сигнал
         send_alert(alerts, chart_buffer, causes_text)
     else:
         print("✅ Резких движений не обнаружено. Молчим.")
