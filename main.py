@@ -456,7 +456,7 @@ def send_to_telegram(text, fear_greed=None):
     
     if image_buffer:
         print("📤 Отправка картинки...")
-        caption = "💼 **ИИ АНАЛИТИК НА СВЯЗИ** \n\n Система завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+        caption = "💼 ИИ АНАЛИТИК НА СВЯЗИ \n\n Система завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
         
         files = {
             'photo': ('cover.jpg', image_buffer, 'image/jpeg'),
