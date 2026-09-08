@@ -11,10 +11,9 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 # ==========================================
-# 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА (УТРО/ВЕЧЕР)
+# 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА
 # ==========================================
 def get_session_info():
-    """Определяем тип выпуска и временной диапазон анализа"""
     msk_tz = timezone(timedelta(hours=3))
     now_msk = datetime.now(msk_tz)
     current_hour = now_msk.hour
@@ -39,7 +38,7 @@ def get_session_info():
     }
 
 # ==========================================
-# 2. СБОР РЕАЛЬНЫХ ДАННЫХ (5 ВЕТОК)
+# 2. СБОР ДАННЫХ
 # ==========================================
 def get_fear_greed_index():
     try:
@@ -66,11 +65,9 @@ def get_global_data():
 
 def get_crypto_data():
     try:
-        # ИСПРАВЛЕНО: убраны все лишние пробелы в URL
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,toncoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true"
         response = requests.get(url, timeout=10).json()
         data = []
-        # ИСПРАВЛЕНО: убраны пробелы в ключах и значениях
         names = {"bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL", "ripple": "XRP", "toncoin": "TON"}
         for key, name in names.items():
             if key in response:
@@ -97,7 +94,6 @@ def get_support_resistance():
         return f"BTC: Ошибка ({str(e)[:30]})"
 
 def get_finance_data():
-    # ИСПРАВЛЕНО: убраны пробелы в ключах и значениях
     tickers = {
         "GC=F": "Золото",
         "SI=F": "Серебро",
@@ -144,8 +140,7 @@ def format_time_ago(published_time):
         elif hours < 24:
             return f"{hours} ч. назад"
         else:
-            days = hours // 24
-            return f"{days} дн. назад"
+            return f"{hours // 24} дн. назад"
     except:
         return ""
 
@@ -200,7 +195,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     if fg_value is None:
         fg_value, fg_class, fg_emoji, fg_signal = 50, "Neutral", "😐", "НЕЙТРАЛЬНО"
     elif fg_value <= 24:
-        fg_emoji, fg_signal = "😰", "ПАНИКА"
+        fg_emoji, fg_signal = "", "ПАНИКА"
     elif fg_value <= 49:
         fg_emoji, fg_signal = "😟", "СТРАХ"
     elif fg_value <= 51:
@@ -210,10 +205,10 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     else:
         fg_emoji, fg_signal = "🤑", "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
     
-    prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков с 10-летним опытом. Твоя задача — создать ДЕТАЛЬНЫЙ, ЖИВОЙ и ПОЛЕЗНЫЙ обзор рынка для Telegram-канала.
+    prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков с 10-летним опытом. Создай ДЕТАЛЬНЫЙ, ЖИВОЙ и ПОЛЕЗНЫЙ обзор рынка для Telegram-канала.
 
 КОНТЕКСТ:
-- Тип выпуска: {session_info['name']}
+- Тип: {session_info['name']} выпуск
 - Дата: {session_info['date']}
 - Период анализа: {session_info['period']}
 
@@ -227,8 +222,8 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [НОВОСТИ]: {news}
 
 КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА:
-1. Используй МНОГО эмодзи для структуры и красоты (🪙🛢️🌐💻🔗⚡🟢🟡🔵)
-2. Жирный шрифт для заголовков разделов
+1. ИСПОЛЬЗУЙ МНОГО эмодзи для структуры и красоты (🛢️🌐💻🔗⚡🟡🔵)
+2. ЖИРНЫЙ шрифт для заголовков разделов
 3. НЕ используй ##, >, ---, таблицы
 4. Сохраняй ссылки [текст](url)
 5. Пиши ПОДРОБНО, с цифрами и процентами
@@ -284,20 +279,20 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - 🟢 ETH: [цена] ([изменение]%) — [комментарий]
 - 🔵 SOL: [цена] ([изменение]%) — [комментарий]
 - 🔵 XRP: [цена] ([изменение]%) — [комментарий]
-- 🟡 Индекс страха/жадности: {fg_value}/100 — [комментарий]
+-  Индекс страха/жадности: {fg_value}/100 — [комментарий]
 - 🔵 Доминация BTC: {btc_dom:.1f}% — [комментарий]
 - 🔵 Капитализация: ${total_mcap:.0f}B — [комментарий]
 - [цвет] S&P 500: [данные] — [комментарий]
 - [цвет] Золото: [данные] — [комментарий]
-- [цвет] Нефть: [данные] — [комментарий]
+- [цвет] Нефть Brent: [данные] — [комментарий]
 - [цвет] NVIDIA: [данные] — [комментарий]
 - [цвет] DXY: [данные] — [комментарий]
 
-⚠️ **РИСК:**
-"Торговля сопряжена с риском. Вы можете потерять ВЕСЬ депозит."
+⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ:**
+"Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
 
 ⚖️ **ДИСКЛЕЙМЕР:**
-"⚠️ Информация НЕ является рекомендацией. DYOR."
+"⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль."
 
 СТИЛЬ:
 - Профессиональный, но ЖИВОЙ (не сухой!)
@@ -334,7 +329,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     return None
 
 # ==========================================
-# 4. ФУТЕР ПОСТА
+# 4. ФУТЕР (ВОССТАНОВЛЕН ПОЛНЫЙ ТЕКСТ)
 # ==========================================
 def get_post_footer(session_info):
     msk_tz = timezone(timedelta(hours=3))
@@ -348,24 +343,25 @@ def get_post_footer(session_info):
         next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
     
     return f"""
-🔔 **СЛЕДУЮЩИЙ ВЫПУСК:** {next_type} в {next_time} МСК ({next_date})
+🔔 **СЛЕДУЮЩИЙ ВЫПУСК:** {next_type} обзор в {next_time} МСК ({next_date})
 
-🔔🚨 **ПОЖАРНЫЙ ШПИОН** — экстренные сигналы
+🔔🚨 **ПОЖАРНЫЙ ШПИОН** — система экстренных оповещений
+Система автоматически мониторит рынки и геополитику 24/7. При резких изменениях (падение/рост >3% за час) в канал придёт экстренный сигнал с графиком, анализом причин и планом действий.
 
-👍 Ставь реакцию если полезно!"""
+👍 Если обзор был полезен — ставь реакцию!
+📢 **Подписывайся на канал**, чтобы не пропустить важные сигналы и торговые идеи!"""
 
 # ==========================================
 # 5. УМНОЕ РАЗБИЕНИЕ (НЕ РАЗРЫВАЕТ РАЗДЕЛЫ)
 # ==========================================
 def smart_split_text(text, max_len=3800):
-    """Разбивает текст по разделам, не разрывая их"""
     sections = []
     current_section = ""
     
     for line in text.split('\n'):
         is_header = any(marker in line for marker in [
-            '🪙 **1.', '🛢️ **2.', '🌍 **3.', '🌐 **4.', '💻 **5.',
-            '🔗 **', '🎯 **', '⚡ **', '⚠️ **', '⚖️ **',
+            '🪙 **1.', '🛢️ **2.', ' **3.', '🌐 **4.', '💻 **5.',
+            '🔗 **', '🎯 **', '⚡ **', '⚠️ **', '️ **',
             '📊 **ИИ АНАЛИТИК', '📈 **ПЕРИОД'
         ])
         
@@ -396,7 +392,7 @@ def smart_split_text(text, max_len=3800):
     return parts
 
 # ==========================================
-# 6. КОЛЛЕКЦИЯ КАРТИНОК (ОЧИЩЕНО ОТ ПРОБЕЛОВ)
+# 6. КАРТИНКИ (CLOUDINARY - ОЧИЩЕНО ОТ ПРОБЕЛОВ)
 # ==========================================
 COVER_IMAGES = {
     'bullish': [
@@ -503,12 +499,12 @@ def send_to_telegram(text, fear_greed=None):
 # 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v31.4 (Усиленный промпт + умное разбиение)...")
+    print("🚀 Запуск ИИ Аналитика v31.5 (Восстановлены полные тексты)...")
     
     session_info = get_session_info()
     print(f"   Тип: {session_info['name']} | {session_info['period']}")
     
-    print("📡 Сбор данных...")
+    print(" Сбор данных...")
     fear_greed = get_fear_greed_index()
     global_data = get_global_data()
     crypto = get_crypto_data()
@@ -540,6 +536,5 @@ def main():
     send_to_telegram(full_text, fear_greed)
     print("✅ Готово!")
 
-# ИСПРАВЛЕНО: правильное написание магической переменной Python
 if __name__ == "__main__":
     main()
