@@ -399,25 +399,25 @@ def smart_split_text(text, max_len=3800):
 # ==========================================
 COVER_IMAGES = {
     'bullish': [
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bullish1.jpeg?token=GHSAT0AAAAAAEHNOMOODPYULKIARNWLUX5M2U76KRQ",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bullish2.jpeg?token=GHSAT0AAAAAAEHNOMOOE3REQMMAHG46YD6Y2U76KWQ",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bullish3.jpeg?token=GHSAT0AAAAAAEHNOMOPIBBCMKMCPU3UWREC2U76K2A",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bullish4.jpeg?token=GHSAT0AAAAAAEHNOMOOQILIQ6ZAPCAGSUFK2U76K4Q",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bullish5.jpeg?token=GHSAT0AAAAAAEHNOMOOMMPYDF5DOJBOEVSY2U76K7A",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788870775/bullish1.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788870869/bullish2.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788870869/bullish4.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871107/bullish3.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871108/bullish5.jpg",
     ],
     'bearish': [
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bearish1.jpeg?token=GHSAT0AAAAAAEHNOMOOQ7TRYTQ52RKPMVYO2U76LBQ",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bearish2.jpeg?token=GHSAT0AAAAAAEHNOMOO2JUVG2KBDM7CYUJC2U76LDA",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bearish3.jpeg?token=GHSAT0AAAAAAEHNOMOPDLUVJHUTJU3PPUBA2U76LFA",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bearish4.jpeg?token=GHSAT0AAAAAAEHNOMOONOSYSQPPP3GC7HBE2U76LHQ",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/bearish5.jpeg?token=GHSAT0AAAAAAEHNOMOOUNOC2XZN5IDS24OS2U76LJA",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871107/bearish2.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871107/bearish1.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871107/bearish3.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871107/bearish4.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871108/bearish5.jpg",
     ],
     'neutral': [
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/neutral1.jpeg?token=GHSAT0AAAAAAEHNOMOPKHD5HIJ5LWA3BKZK2U76LLQ",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/neutral2.jpeg?token=GHSAT0AAAAAAEHNOMOO6ADLP4T3VFP3VVAS2U76LNA",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/neutral3.jpeg?token=GHSAT0AAAAAAEHNOMOOCYOQT6ERSTESWXMK2U76LPA",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/neutral4.jpeg?token=GHSAT0AAAAAAEHNOMOO23V6UREAP6QRXHEQ2U76LQQ",
-        "https://raw.githubusercontent.com/volk6691ilya-lgtm/ember-watch/refs/heads/main/images/neutral5.jpeg?token=GHSAT0AAAAAAEHNOMOPYPEHU23VK2RVPUL42U76LTA",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871108/neutral1.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871108/neutral2.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871108/neutral3.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871108/neutral4.jpg",
+        "https://res.cloudinary.com/yln8uskh/image/upload/v1788871109/neutral5.jpg",
     ]
 }
 
