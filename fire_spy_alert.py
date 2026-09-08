@@ -216,27 +216,47 @@ def analyze_causes_with_ai(alerts, news_data):
 
 ОТВЕТЬ ТОЛЬКО В ЭТОМ ФОРМАТЕ, БЕЗ ДОПОЛНИТЕЛЬНЫХ КОММЕНТАРИЕВ."""
     
-    try:
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        payload = {
-            "model": "minimax/minimax-m3:free",
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-        else:
-            print(f"⚠️ ИИ недоступен (статус {response.status_code}), используем простой анализ")
-            return format_simple_causes(news_data)
-    except Exception as e:
-        print(f"️ Ошибка ИИ-анализа: {e}")
-        return format_simple_causes(news_data)
+        # 🚀 СПИСОК ПРОВЕРЕННЫХ РАБОЧИХ МОДЕЛЕЙ ДЛЯ ЭКСТРЕННЫХ СИГНАЛОВ
+    fire_spy_models = [
+        "inclusionai/ling-3.0-flash-fin:free",       # 🏆 Лучшая для финансов
+        "nvidia/nemotron-3-super-120b-a12b:free",    # 🚀 Мощная и быстрая
+        "google/gemma-4-31b-it:free",                # 🌟 От Google
+        "google/gemma-4-26b-a4b-it:free",            # ⚡ Очень быстрая
+        "nvidia/nemotron-3.5-lightning:free"         # ⚡ Молниеносная
+    ]
+    
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    # Перебираем модели по очереди, пока одна не ответит успешно
+    for model in fire_spy_models:
+        try:
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'choices' in result and len(result['choices']) > 0:
+                    content = result['choices'][0]['message']['content']
+                    # Проверяем, что ответ не пустой и не слишком короткий
+                    if content and len(content.strip()) > 50:
+                        print(f"✅ Успешный анализ через модель: {model}")
+                        return content
+            # Если статус не 200 или ответ пустой, цикл автоматически перейдёт к следующей модели
+            
+        except Exception:
+            continue  # Игнорируем ошибку и пробуем следующую модель
+    
+    # Если все модели в списке не ответили, используем запасной вариант
+    print("⚠️ Все модели OpenRouter недоступны, используем простой анализ новостей")
+    return format_simple_causes(news_data)
 
 # ==========================================
 # 5. ПРОСТОЙ АНАЛИЗ (БЕЗ ИИ)
