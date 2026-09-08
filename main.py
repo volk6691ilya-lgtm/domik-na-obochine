@@ -188,9 +188,22 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     models = [
-        "minimax/minimax-m3:free",
+        #  ЛУЧШИЕ ДЛЯ ФИНАНСОВОГО АНАЛИЗА
+        "inclusionai/ling-3.0-flash-fin:free",  # Специально для финансов!
+        "nvidia/nemotron-3-super-120b-a12b:free",  # Мощная 120B
+        "google/gemma-4-31b-it:free",  # От Google
+        
+        # ⚡ БЫСТРЫЕ И НАДЁЖНЫЕ
+        "google/gemma-4-26b-a4b-it:free",
         "nvidia/nemotron-3.5-lightning:free",
-        "inclusionai/ling-3.0-flash-fin:free"
+        "cohere/north-mini-code:free",
+        
+        # 🔄 ДОПОЛНИТЕЛЬНЫЙ РЕЗЕРВ
+        "inclusionai/ling-3.0-flash-sante:free",
+        "dots-studio/dots-3-note-preview:free",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "nvidia/nemotron-3.5-content-safety:free",
+        "liquid/lfm-2.5-2.6b:free",
     ]
     
     fg_value, fg_class = fear_greed
