@@ -3,7 +3,6 @@ import requests
 import json
 import time
 import random
-import re
 import yfinance as yf
 import feedparser
 import pandas as pd
@@ -168,7 +167,7 @@ def get_news_data():
         return "• Новости: Ошибка сбора данных"
 
 # ==========================================
-# 3. ИИ-АНАЛИЗ (УСИЛЕННЫЙ ПРОМПТ)
+# 3. ИИ-АНАЛИЗ (УСИЛЕННЫЙ ПРОМПТ С ЖИРНЫМИ ЗАГОЛОВКАМИ)
 # ==========================================
 def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news):
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -195,7 +194,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     if fg_value is None:
         fg_value, fg_class, fg_emoji, fg_signal = 50, "Neutral", "😐", "НЕЙТРАЛЬНО"
     elif fg_value <= 24:
-        fg_emoji, fg_signal = "", "ПАНИКА"
+        fg_emoji, fg_signal = "😰", "ПАНИКА"
     elif fg_value <= 49:
         fg_emoji, fg_signal = "😟", "СТРАХ"
     elif fg_value <= 51:
@@ -203,105 +202,133 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     elif fg_value <= 74:
         fg_emoji, fg_signal = "😊", "ЖАДНОСТЬ"
     else:
-        fg_emoji, fg_signal = "🤑", "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
+        fg_emoji, fg_signal = "", "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
     
-    prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков с 10-летним опытом. Создай ДЕТАЛЬНЫЙ, ЖИВОЙ и ПОЛЕЗНЫЙ обзор рынка для Telegram-канала.
+    prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков. Создай ОБЪЕКТИВНЫЙ обзор рынка для Telegram-канала.
 
 КОНТЕКСТ:
 - Тип: {session_info['name']} выпуск
 - Дата: {session_info['date']}
-- Период анализа: {session_info['period']}
+- ПЕРИОД АНАЛИЗА: {session_info['period']}
 
 ДАННЫЕ:
 [ИНДЕКС СТРАХА/ЖАДНОСТИ]: {fg_value}/100 ({fg_class}) → {fg_emoji} {fg_signal}
 [ДОМИНАЦИЯ BTC]: {btc_dom:.1f}%
-[КАПИТАЛИЗАЦИЯ РЫНКА]: ${total_mcap:.0f}B
-[КРИПТОВАЛЮТЫ]: {crypto}
+[КАПИТАЛИЗАЦИЯ]: ${total_mcap:.0f}B
+[КРИПТА]: {crypto}
 [УРОВНИ BTC]: {support_resistance}
-[ТОВАРНЫЕ РЫНКИ]: {finance}
+[РЫНКИ]: {finance}
 [НОВОСТИ]: {news}
 
-КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА:
-1. ИСПОЛЬЗУЙ МНОГО эмодзи для структуры и красоты (🛢️🌐💻🔗⚡🟡🔵)
-2. ЖИРНЫЙ шрифт для заголовков разделов
-3. НЕ используй ##, >, ---, таблицы
-4. Сохраняй ссылки [текст](url)
-5. Пиши ПОДРОБНО, с цифрами и процентами
-6. Объём: 3800-4200 символов
+⚠️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
+1. НЕ используй символы ## (заголовки Markdown)
+2. НЕ используй символ > (цитаты)
+3. НЕ используй --- (разделители)
+4. НЕ используй таблицы с |
+5. Используй ТОЛЬКО: обычный текст, **жирный шрифт**, эмодзи для структуры
+6. Сохраняй КЛИКАБЕЛЬНЫЕ ССЫЛКИ в новостях в формате [текст](url) — НЕ УДАЛЯЙ ИХ!
+7. НЕ сокращай блоки — пиши каждый раздел полноценно
+8. Обязательно используй переносы строк между абзацами!
 
-СТРУКТУРА (все разделы ОБЯЗАТЕЛЬНЫ):
+🔥🔥 САМОЕ ВАЖНОЕ ПРАВИЛО:
+ВСЕ заголовки разделов ДОЛЖНЫ быть в **ЖИРНОМ шрифте** с эмодзи!
 
-📊 **ИИ АНАЛИТИК: {session_info['name']} ОБЗОР** — {session_info['date']}
+ПРИМЕР ПРАВИЛЬНОГО ФОРМАТИРОВАНИЯ:
+📊 **ИИ АНАЛИТИК: ВЕЧЕРНИЙ ОБЗОР — 08.09.2026**
+📈 **ПЕРИОД АНАЛИЗА:** с 09:00 по 21:00 08.09.2026 (дневная сессия)
+🪙 **1. КРИПТОРЫНОК**
+️ **2. СЫРЬЁ**
+🌍 **3. МАКРО-ФОН**
+🌐 **4. ГЕОПОЛИТИКА**
+💻 **5. IT И ТЕХНОЛОГИИ**
+ **СВЯЗЬ ВЕТОК**
+🎯 **ТОРГОВЫЕ ИДЕИ (3 совета):**
+⚡ **QUICK STATS**
+⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ**
+⚖️ **ДИСКЛЕЙМЕР**
+
+СТРУКТУРА ПОСТА (ВСЕ БЛОКИ ОБЯЗАТЕЛЬНЫ):
+
+📊 **ИИ АНАЛИТИК: {session_info['name']} ОБЗОР — {session_info['date']}**
 
 📈 **ПЕРИОД АНАЛИЗА:** {session_info['period']}
 
 ⚠️ Сначала риски, потом возможности!
 
 🪙 **1. КРИПТОРЫНОК**
-- BTC, ETH, SOL, XRP: цены, объёмы, изменения
+- BTC, ETH, SOL, XRP: цены, объёмы, изменения за период
 - Уровни поддержки/сопротивления BTC
-- Доминация BTC: {btc_dom:.1f}% — что это значит для рынка
-- Капитализация: ${total_mcap:.0f}B
-- Анализ: что происходит, почему, куда движется
+- Доминация BTC: {btc_dom:.1f}% — что это значит
+- Общая капитализация: ${total_mcap:.0f}B
+- Анализ: что происходит и почему
 
 🛢️ **2. СЫРЬЁ**
-- Золото, Серебро, Нефть Brent из [ТОВАРНЫЕ РЫНКИ]
+- Золото, Серебро, Нефть Brent: цены и изменения из блока [РЫНКИ]
 - Связь с инфляцией и риск-аппетитом
 - Анализ: куда движутся "умные деньги"
 
 🌍 **3. МАКРО-ФОН**
-- S&P 500, DXY из [ТОВАРНЫЕ РЫНКИ]
+- S&P 500, DXY (индекс доллара): цены и изменения из блока [РЫНКИ]
 - Индекс страха/жадности: {fg_value}/100 ({fg_class})
-- Анализ: риск-он или риск-офф? Что доминирует?
+- Анализ: риск-он или риск-офф?
 
-🌐 **4. ГЕОПОЛИТИКА**
-- Новости из [НОВОСТИ] (регуляция, законы, санкции)
-- СОХРАНЯЙ ссылки [текст](url)
+ **4. ГЕОПОЛИТИКА**
+- Новости из блока [НОВОСТИ] (регуляция, законы, санкции)
+- СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ [текст](url) — НЕ ПЕРЕПИСЫВАЙ ЗАГОЛОВКИ!
 - Временные метки [X ч. назад]
-- Влияние на рынки: как это повлияет
+- Влияние на рынки
 
 💻 **5. IT И ТЕХНОЛОГИИ**
-- NVIDIA из [ТОВАРНЫЕ РЫНКИ]
+- NVIDIA: цена и изменение из блока [РЫНКИ]
 - Новости про ETF, биржи, институционалов
 - Анализ: куда движется "умный капитал"
 
-🔗 **СВЯЗЬ ВЕТОК**
+🔗 **СВЯЗЬ ВЕТОК:**
 - Как геополитика/IT влияют на крипту
 - Комплексный вывод: что это значит для рынка
 
 🎯 **ТОРГОВЫЕ ИДЕИ (3 совета):**
-1️⃣ [Конкретное действие с % и уровнями]: [Подробное пояснение]
-2️⃣ [Конкретное действие с % и уровнями]: [Подробное пояснение]
-3️⃣ [Конкретное действие с % и уровнями]: [Подробное пояснение]
+1️ [Конкретное действие]: [Пояснение с процентами и уровнями]
+2️ [Конкретное действие]: [Пояснение с процентами и уровнями]
+3️⃣ [Конкретное действие]: [Пояснение с процентами и уровнями]
 
-⚡ **QUICK STATS (ВСЕ пункты, не сокращай!):**
+⚡ **QUICK STATS (ОБЯЗАТЕЛЬНО ВСЕ ПУНКТЫ, НЕ СОКРАЩАЙ!):**
+Используй цветовую кодировку:
+- 🟢 зелёный = рост/бычий сигнал
+- 🔴 красный = падение/медвежий сигнал
+-  жёлтый = предупреждение/нейтрально
+- 🔵 синий = факт/объём
+
+Включи ВСЕ эти метрики:
 - 🔵 BTC: [цена] ([изменение]%) — [комментарий]
 - 🟢 ETH: [цена] ([изменение]%) — [комментарий]
 - 🔵 SOL: [цена] ([изменение]%) — [комментарий]
 - 🔵 XRP: [цена] ([изменение]%) — [комментарий]
 -  Индекс страха/жадности: {fg_value}/100 — [комментарий]
 - 🔵 Доминация BTC: {btc_dom:.1f}% — [комментарий]
-- 🔵 Капитализация: ${total_mcap:.0f}B — [комментарий]
-- [цвет] S&P 500: [данные] — [комментарий]
-- [цвет] Золото: [данные] — [комментарий]
-- [цвет] Нефть Brent: [данные] — [комментарий]
-- [цвет] NVIDIA: [данные] — [комментарий]
-- [цвет] DXY: [данные] — [комментарий]
+- 🔵 Общая капитализация: ${total_mcap:.0f}B — [комментарий]
+- [цвет] S&P 500: [из данных] — [комментарий]
+- [цвет] Золото: [из данных] — [комментарий]
+- [цвет] Нефть Brent: [из данных] — [комментарий]
+- [цвет] NVIDIA: [из данных] — [комментарий]
+- [цвет] DXY: [из данных] — [комментарий]
 
-⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ:**
+️ **РИСК-ПРЕДУПРЕЖДЕНИЕ:**
 "Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
 
-⚖️ **ДИСКЛЕЙМЕР:**
+️ **ДИСКЛЕЙМЕР (ТОЧНЫЙ ТЕКСТ, НЕ СОКРАЩАТЬ!):**
 "⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль."
 
-СТИЛЬ:
-- Профессиональный, но ЖИВОЙ (не сухой!)
-- Сленг с расшифровками: "лонг сквизнуло (long squeeze — принудительное закрытие)"
-- Конкретика: цифры, проценты, уровни
-- БЕЗ ВОДЫ: каждое предложение = информация
-- Используй эмодзи: 📊💹💰💵🎯🛑⚠️🔍💡🔔
+ПРАВИЛА СТИЛЯ:
+- Тон: профессиональный, но живой (не сухой)
+- Сленг с расшифровками в скобках: "лонг сквизнуло (long squeeze — принудительное закрытие позиций)"
+- Конкретные цифры и проценты
+- БЕЗ ВОДЫ: каждое предложение должно нести информацию
+- Объём: 3500-4000 символов (подробно, но без повторов)
+- Используй эмодзи: 📉💹💰💵🌐🛑⚠️🔍💡🔔
+- НЕ добавляй информацию о следующем выпуске — система добавит автоматически
 
-ПРИСТУПАЙ! Создай ЛУЧШИЙ анализ!"""
+ПРИСТУПАЙ!"""
     
     for model in models:
         try:
@@ -323,13 +350,13 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
                     content = result['choices'][0]['message']['content']
                     if content and len(content.strip()) > 200:
                         return content
-        except:
+        except Exception:
             continue
     
     return None
 
 # ==========================================
-# 4. ФУТЕР (ВОССТАНОВЛЕН ПОЛНЫЙ ТЕКСТ)
+# 4. ФУТЕР ПОСТА
 # ==========================================
 def get_post_footer(session_info):
     msk_tz = timezone(timedelta(hours=3))
@@ -343,48 +370,31 @@ def get_post_footer(session_info):
         next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
     
     return f"""
-🔔 **СЛЕДУЮЩИЙ ВЫПУСК:** {next_type} обзор в {next_time} МСК ({next_date})
+ **СЛЕДУЮЩИЙ ВЫПУСК:** {next_type} обзор в {next_time} МСК ({next_date})
 
 🔔🚨 **ПОЖАРНЫЙ ШПИОН** — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику 24/7. При резких изменениях (падение/рост >3% за час) в канал придёт экстренный сигнал с графиком, анализом причин и планом действий.
 
-👍 Если обзор был полезен — ставь реакцию!
+ Если обзор был полезен — ставь реакцию!
 📢 **Подписывайся на канал**, чтобы не пропустить важные сигналы и торговые идеи!"""
 
 # ==========================================
-# 5. УМНОЕ РАЗБИЕНИЕ (НЕ РАЗРЫВАЕТ РАЗДЕЛЫ)
+# 5. УМНОЕ РАЗБИЕНИЕ
 # ==========================================
 def smart_split_text(text, max_len=3800):
-    sections = []
-    current_section = ""
-    
-    for line in text.split('\n'):
-        is_header = any(marker in line for marker in [
-            '🪙 **1.', '🛢️ **2.', ' **3.', '🌐 **4.', '💻 **5.',
-            '🔗 **', '🎯 **', '⚡ **', '⚠️ **', '️ **',
-            '📊 **ИИ АНАЛИТИК', '📈 **ПЕРИОД'
-        ])
-        
-        if is_header:
-            if current_section.strip():
-                sections.append(current_section.strip())
-            current_section = line + '\n'
-        else:
-            current_section += line + '\n'
-    
-    if current_section.strip():
-        sections.append(current_section.strip())
-    
+    paragraphs = text.split('\n\n')
     parts = []
     current_part = ""
     
-    for section in sections:
-        if len(current_part) + len(section) + 2 <= max_len:
-            current_part += section + "\n\n"
+    for para in paragraphs:
+        if not para.strip():
+            continue
+        if len(current_part) + len(para) + 2 <= max_len:
+            current_part += para + "\n\n"
         else:
             if current_part.strip():
                 parts.append(current_part.strip())
-            current_part = section + "\n\n"
+            current_part = para + "\n\n"
     
     if current_part.strip():
         parts.append(current_part.strip())
@@ -392,7 +402,7 @@ def smart_split_text(text, max_len=3800):
     return parts
 
 # ==========================================
-# 6. КАРТИНКИ (CLOUDINARY - ОЧИЩЕНО ОТ ПРОБЕЛОВ)
+# 6. КАРТИНКИ (CLOUDINARY - ТВОИ НОВЫЕ ССЫЛКИ)
 # ==========================================
 COVER_IMAGES = {
     'bullish': [
@@ -424,17 +434,30 @@ def get_cover_image(fear_greed):
     
     image_url = random.choice(COVER_IMAGES.get(mood, [])) if COVER_IMAGES.get(mood) else None
     if not image_url:
+        all_images = []
+        for images in COVER_IMAGES.values():
+            all_images.extend(images)
+        image_url = random.choice(all_images) if all_images else None
+    
+    if not image_url:
+        print("⚠️ Нет картинок в коллекции!")
         return None
     
     try:
+        print(f"🎨 Скачивание картинки (настроение: {mood})...")
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
         }
         response = requests.get(image_url, headers=headers, timeout=30)
         if response.status_code == 200 and len(response.content) > 1000:
+            print(f"✅ Картинка скачана успешно (размер: {len(response.content)} байт)")
             return BytesIO(response.content)
-        return None
-    except:
+        else:
+            print(f"⚠️ Ошибка скачивания: статус {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"⚠️ Критическая ошибка при скачивании: {e}")
         return None
 
 # ==========================================
@@ -445,96 +468,132 @@ def send_to_telegram(text, fear_greed=None):
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
     if not bot_token or not channel_id:
-        print("❌ Ошибка: токены не установлены")
+        print("❌ Ошибка: TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID не установлены")
         return
     
+    print("🖼️ Выбор картинки из коллекции...")
     image_buffer = get_cover_image(fear_greed)
-    caption = "💼 **ИИ АНАЛИТИК НА СВЯЗИ**\n\nСистема завершила анализ 5 ветвей рынка 👇"
     
     if image_buffer:
+        print("📤 Отправка картинки...")
+        caption = "💼 **ИИ АНАЛИТИК НА СВЯЗИ**\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+        
         files = {
             'photo': ('cover.jpg', image_buffer, 'image/jpeg'),
             'chat_id': (None, channel_id),
             'caption': (None, caption)
         }
-        response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", files=files, timeout=30)
-        if response.status_code != 200:
-            print(f"⚠️ Ошибка картинки: {response.text}")
+        
+        response = requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+            files=files,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            print("✅ Картинка успешно отправлена в Telegram!")
+        else:
+            print(f"❌ Ошибка отправки картинки: {response.text}")
         time.sleep(2)
+    else:
+        print("⚠️ Картинка не получена, отправляем только текст...")
     
     parts = smart_split_text(text, max_len=3800)
-    total = len(parts)
+    total_parts = len(parts)
+    print(f"📤 Отправка {total_parts} частей текста...")
     
     for i, part in enumerate(parts):
         if i > 0:
             time.sleep(3)
         
-        if total > 1:
-            header = f"📄 **ЧАСТЬ {i+1}/{total}**\n\n"
-            footer = f"\n\n_...продолжение (часть {i+1}/{total})_" if i < total - 1 else ""
-            text_part = header + part + footer
+        if total_parts > 1:
+            header = f"📄 **ЧАСТЬ {i+1}/{total_parts}**\n\n"
+            footer_text = f"\n\n_...продолжение следует (часть {i+1}/{total_parts})_" if i < total_parts - 1 else ""
+            part_with_indicator = header + part + footer_text
         else:
-            text_part = part
+            part_with_indicator = part
         
-        if len(text_part) > 4090:
-            text_part = text_part[:4080] + "\n\n_...обрезано_"
+        if len(part_with_indicator) > 4090:
+            part_with_indicator = part_with_indicator[:4080] + "\n\n_...текст обрезан_"
+        
+        text_payload = {
+            "chat_id": channel_id,
+            "text": part_with_indicator,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
+        }
         
         response = requests.post(
             f"https://api.telegram.org/bot{bot_token}/sendMessage",
-            json={
-                "chat_id": channel_id,
-                "text": text_part,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True
-            },
+            json=text_payload,
             timeout=15
         )
         
         if response.status_code == 200:
-            print(f"✅ Часть {i+1}/{total} отправлена")
+            print(f"✅ Часть {i+1}/{total_parts} отправлена! (длина: {len(part_with_indicator)})")
         else:
-            print(f"❌ Ошибка: {response.text}")
+            print(f"❌ Ошибка части {i+1}: {response.text}")
 
 # ==========================================
 # 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v31.5 (Восстановлены полные тексты)...")
+    print("🚀 Запуск ИИ Аналитика v31.6 (Cloudinary + жирные заголовки)...")
     
+    print("📡 Определение типа выпуска...")
     session_info = get_session_info()
-    print(f"   Тип: {session_info['name']} | {session_info['period']}")
+    print(f"   Тип: {session_info['name']} выпуск")
+    print(f"   Период: {session_info['period']}")
     
-    print(" Сбор данных...")
+    print("📡 Сбор данных (5 веток)...")
     fear_greed = get_fear_greed_index()
     global_data = get_global_data()
     crypto = get_crypto_data()
-    support = get_support_resistance()
+    support_resistance = get_support_resistance()
     finance = get_finance_data()
     news = get_news_data()
     
-    print("🧠 ИИ-анализ...")
-    analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support, finance, news)
-    
-    if not analysis:
-        print("⚠️ ИИ не ответил, используем резерв")
-        fg_value = fear_greed[0] if fear_greed and fear_greed[0] else 50
-        fg_class = fear_greed[1] if fear_greed and len(fear_greed) > 1 else "Neutral"
-        analysis = f"""⚠️ **ИИ временно недоступен**. Свежие данные:
+    print("🧠 ИИ-анализ (30-60 секунд)...")
+    try:
+        analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
+        
+        if not analysis or len(analysis.strip()) < 200:
+            print("⚠️ ИИ вернул пустой или слишком короткий ответ. Используем резервный текст.")
+            fg_value = fear_greed[0] if fear_greed and fear_greed[0] is not None else 50
+            fg_class = fear_greed[1] if fear_greed and len(fear_greed) > 1 else "Neutral"
+            analysis = f"""⚠️ **Внимание:** Сервисы ИИ-анализа временно перегружены. Система не смогла сгенерировать подробный обзор, но свежие данные ниже абсолютно актуальны.
 
 🪙 **КРИПТОРЫНОК:**
 {crypto}
 
-📊 **РЫНКИ:**
+📊 **РЫНКИ И СЫРЬЁ:**
 {finance}
 
-🌡️ **ИНДЕКС:** {fg_value}/100 ({fg_class})"""
+🌡️ **ИНДЕКС СТРАХА/ЖАДНОСТИ:** {fg_value}/100 ({fg_class})
+
+🔍 Полный анализ с торговыми идеями будет в следующем выпуске."""
+    except Exception as e:
+        print(f" Ошибка ИИ-анализа: {e}")
+        fg_value = fear_greed[0] if fear_greed and fear_greed[0] is not None else 50
+        fg_class = fear_greed[1] if fear_greed and len(fear_greed) > 1 else "Neutral"
+        analysis = f"""⚠️ **Внимание:** Произошла техническая ошибка при генерации анализа. Свежие данные ниже актуальны.
+
+🪙 **КРИПТОРЫНОК:**
+{crypto}
+
+📊 **РЫНКИ И СЫРЬЁ:**
+{finance}
+
+🌡️ **ИНДЕКС СТРАХА/ЖАДНОСТИ:** {fg_value}/100 ({fg_class})"""
     
-    full_text = analysis + "\n\n" + get_post_footer(session_info)
-    print(f"📏 Длина: {len(full_text)} символов")
+    print("📎 Добавление футера...")
+    footer = get_post_footer(session_info)
+    full_text = analysis + "\n\n" + footer
+    print(f"📏 Длина текста: {len(full_text)} символов")
     
     print("📤 Публикация...")
     send_to_telegram(full_text, fear_greed)
-    print("✅ Готово!")
+    print("✅ Миссия выполнена.")
 
 if __name__ == "__main__":
     main()
