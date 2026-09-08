@@ -600,9 +600,13 @@ def main():
     print("🧠 ИИ-анализ (30-60 секунд)...")
     try:
         analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
+        # 🔥 ДОБАВЛЕНО: Проверка на пустой ответ от ИИ
+        if not analysis:
+            print("⚠️ ИИ вернул пустой ответ. Используем резервный текст.")
+            analysis = "️ **Внимание:** Сервисы ИИ-анализа временно перегружены. Система не смогла сгенерировать подробный обзор, но данные ниже актуальны.\n\n" + crypto + "\n\n" + finance
     except Exception as e:
         print(f"❌ Ошибка ИИ-анализа: {e}")
-        analysis = "Ошибка генерации анализа."
+        analysis = "⚠️ **Внимание:** Произошла техническая ошибка при генерации анализа. Данные ниже актуальны.\n\n" + crypto + "\n\n" + finance
     
     print("📎 Добавление футера...")
     footer = get_post_footer(session_info)
