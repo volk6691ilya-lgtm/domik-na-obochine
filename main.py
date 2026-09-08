@@ -595,9 +595,9 @@ def send_to_telegram(text, fear_greed=None):
 # 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v30.0 (5 веток + красивые эмодзи)...")
+    print("🚀 Запуск ИИ Аналитика v30.1 (5 веток + улучшенная страховка)...")
     
-    print(" Определение типа выпуска...")
+    print("📡 Определение типа выпуска...")
     session_info = get_session_info()
     print(f"   Тип: {session_info['name']} выпуск")
     print(f"   Период: {session_info['period']}")
@@ -613,13 +613,42 @@ def main():
     print("🧠 ИИ-анализ (30-60 секунд)...")
     try:
         analysis = get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news)
-        # 🔥 ДОБАВЛЕНО: Проверка на пустой ответ от ИИ
-        if not analysis:
-            print("⚠️ ИИ вернул пустой ответ. Используем резервный текст.")
-            analysis = "️ **Внимание:** Сервисы ИИ-анализа временно перегружены. Система не смогла сгенерировать подробный обзор, но данные ниже актуальны.\n\n" + crypto + "\n\n" + finance
+        
+        # 🔥 УЛУЧШЕННАЯ СТРАХОВКА: проверка на пустой ИЛИ слишком короткий ответ (< 200 символов)
+        if not analysis or len(analysis.strip()) < 200:
+            print("⚠️ ИИ вернул пустой или слишком короткий ответ. Используем резервный текст.")
+            
+            # Безопасно извлекаем данные для красивого резервного сообщения
+            fg_value = fear_greed[0] if fear_greed and fear_greed[0] is not None else 50
+            fg_class = fear_greed[1] if fear_greed and len(fear_greed) > 1 else "Neutral"
+            
+            analysis = f"""⚠️ **Внимание:** Сервисы ИИ-анализа временно перегружены. Система не смогла сгенерировать подробный обзор, но свежие данные ниже абсолютно актуальны.
+
+🪙 **КРИПТОРЫНОК:**
+{crypto}
+
+📊 **РЫНКИ И СЫРЬЁ:**
+{finance}
+
+🌡️ **ИНДЕКС СТРАХА/ЖАДНОСТИ:** {fg_value}/100 ({fg_class})
+
+🔍 Полный анализ с торговыми идеями будет в следующем выпуске."""
+            
     except Exception as e:
         print(f"❌ Ошибка ИИ-анализа: {e}")
-        analysis = "⚠️ **Внимание:** Произошла техническая ошибка при генерации анализа. Данные ниже актуальны.\n\n" + crypto + "\n\n" + finance
+        
+        fg_value = fear_greed[0] if fear_greed and fear_greed[0] is not None else 50
+        fg_class = fear_greed[1] if fear_greed and len(fear_greed) > 1 else "Neutral"
+        
+        analysis = f"""⚠️ **Внимание:** Произошла техническая ошибка при генерации анализа. Свежие данные ниже актуальны.
+
+🪙 **КРИПТОРЫНОК:**
+{crypto}
+
+📊 **РЫНКИ И СЫРЬЁ:**
+{finance}
+
+🌡️ **ИНДЕКС СТРАХА/ЖАДНОСТИ:** {fg_value}/100 ({fg_class})"""
     
     print("📎 Добавление футера...")
     footer = get_post_footer(session_info)
@@ -633,3 +662,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
