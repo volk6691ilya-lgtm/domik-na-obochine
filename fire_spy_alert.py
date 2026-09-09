@@ -1,6 +1,7 @@
 import os
 import requests
 import time
+import json
 import yfinance as yf
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -11,9 +12,9 @@ import feedparser
 # ==========================================
 # КОНФИГУРАЦИЯ
 # ==========================================
-ALERT_THRESHOLD_CRYPTO = 3.0  # % за час для крипты
-ALERT_THRESHOLD_STOCKS = 2.0 # % за час для акций/сырья
-MINUTES_BETWEEN_ALERTS = 60  # минимум минут между сигналами
+ALERT_THRESHOLD_CRYPTO = 3.0  # % для крипты
+ALERT_THRESHOLD_STOCKS = 2.0  # % для акций/сырья
+MINUTES_BETWEEN_ALERTS = 60   # минимум минут между сигналами (доп. защита)
 
 # Тикеры для мониторинга
 CRYPTO_TICKERS = {
@@ -28,8 +29,31 @@ STOCK_TICKERS = {
     "NVDA": "NVIDIA"
 }
 
+STATE_FILE = "spy_state.json"
+
 # ==========================================
-# 1. ПРОВЕРКА ПОСЛЕДНЕГО СИГНАЛА
+# УПРАВЛЕНИЕ СОСТОЯНИЕМ (НОВОЕ: ШАГ 2)
+# ==========================================
+def load_state():
+    """Загружает состояние из файла памяти"""
+    try:
+        if os.path.exists(STATE_FILE):
+            with open(STATE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {"last_alerts": {}}
+
+def save_state(state):
+    """Сохраняет состояние в файл памяти"""
+    try:
+        with open(STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        print(f"⚠️ Ошибка сохранения состояния: {e}")
+
+# ==========================================
+# 1. ПРОВЕРКА ПОСЛЕДНЕГО СИГНАЛА (ОСТАВЛЕНО КАК ДОП. ЗАЩИТА)
 # ==========================================
 def check_last_alert():
     """Проверяет, когда был последний сигнал в канале"""
@@ -61,12 +85,17 @@ def check_last_alert():
         return False
 
 # ==========================================
-# 2. ПРОВЕРКА РЕЗКИХ ДВИЖЕНИЙ
+# 2. ПРОВЕРКА РЕЗКИХ ДВИЖЕНИЙ (УМНАЯ, С ПАМЯТЬЮ ЦЕН)
 # ==========================================
 def check_price_movements():
-    """Проверяет резкие движения цен за последний час"""
+    """Проверяет резкие движения цен с учётом сохранённой цены последнего алерта"""
     alerts = []
+    state = load_state()
     
+    if "last_alerts" not in state:
+        state["last_alerts"] = {}
+    
+    # Проверяем крипту
     for ticker, name in CRYPTO_TICKERS.items():
         try:
             asset = yf.Ticker(ticker)
@@ -75,20 +104,41 @@ def check_price_movements():
             if not hist.empty and len(hist) >= 12:
                 current_price = hist['Close'].iloc[-1]
                 price_1h_ago = hist['Close'].iloc[-12]
-                change_percent = ((current_price - price_1h_ago) / price_1h_ago) * 100
                 
-                if abs(change_percent) >= ALERT_THRESHOLD_CRYPTO:
-                    alerts.append({
-                        'name': name,
-                        'ticker': ticker,
-                        'current_price': current_price,
-                        'change': change_percent,
-                        'type': 'crypto'
-                    })
-                    print(f"🚨 {name}: {change_percent:+.2f}% за час!")
+                if ticker in state["last_alerts"]:
+                    # У нас уже есть запомненная цена для этого актива
+                    reference_price = state["last_alerts"][ticker]["price"]
+                    change_from_ref = ((current_price - reference_price) / reference_price) * 100
+                    
+                    print(f"📊 {name}: текущая ${current_price:,.2f}, изменение от последнего алерта (${reference_price:,.2f}): {change_from_ref:+.2f}%")
+                    
+                    if abs(change_from_ref) >= ALERT_THRESHOLD_CRYPTO:
+                        alerts.append({
+                            'name': name, 'ticker': ticker,
+                            'current_price': current_price,
+                            'change': change_from_ref, 'type': 'crypto'
+                        })
+                        # Обновляем опорную цену в памяти
+                        state["last_alerts"][ticker] = {"price": current_price, "time": datetime.now().isoformat()}
+                        print(f"🚨 {name}: {change_from_ref:+.2f}% от последнего алерта! ДОБАВЛЕНО")
+                else:
+                    # Первый алерт для этого актива, сравниваем с ценой час назад
+                    change_1h = ((current_price - price_1h_ago) / price_1h_ago) * 100
+                    
+                    if abs(change_1h) >= ALERT_THRESHOLD_CRYPTO:
+                        alerts.append({
+                            'name': name, 'ticker': ticker,
+                            'current_price': current_price,
+                            'change': change_1h, 'type': 'crypto'
+                        })
+                        # Сохраняем первую опорную цену
+                        state["last_alerts"][ticker] = {"price": current_price, "time": datetime.now().isoformat()}
+                        print(f"🚨 {name}: {change_1h:+.2f}% за час (ПЕРВЫЙ АЛЕРТ)! ДОБАВЛЕНО")
+                        
         except Exception as e:
-            print(f"️ Ошибка проверки {name}: {e}")
+            print(f"⚠️ Ошибка проверки {name}: {e}")
     
+    # Проверяем акции/сырьё
     for ticker, name in STOCK_TICKERS.items():
         try:
             asset = yf.Ticker(ticker)
@@ -97,20 +147,38 @@ def check_price_movements():
             if not hist.empty and len(hist) >= 12:
                 current_price = hist['Close'].iloc[-1]
                 price_1h_ago = hist['Close'].iloc[-12]
-                change_percent = ((current_price - price_1h_ago) / price_1h_ago) * 100
                 
-                if abs(change_percent) >= ALERT_THRESHOLD_STOCKS:
-                    alerts.append({
-                        'name': name,
-                        'ticker': ticker,
-                        'current_price': current_price,
-                        'change': change_percent,
-                        'type': 'stock'
-                    })
-                    print(f"🚨 {name}: {change_percent:+.2f}% за час!")
+                if ticker in state["last_alerts"]:
+                    reference_price = state["last_alerts"][ticker]["price"]
+                    change_from_ref = ((current_price - reference_price) / reference_price) * 100
+                    
+                    print(f"📊 {name}: текущая ${current_price:,.2f}, изменение от последнего алерта (${reference_price:,.2f}): {change_from_ref:+.2f}%")
+                    
+                    if abs(change_from_ref) >= ALERT_THRESHOLD_STOCKS:
+                        alerts.append({
+                            'name': name, 'ticker': ticker,
+                            'current_price': current_price,
+                            'change': change_from_ref, 'type': 'stock'
+                        })
+                        state["last_alerts"][ticker] = {"price": current_price, "time": datetime.now().isoformat()}
+                        print(f"🚨 {name}: {change_from_ref:+.2f}% от последнего алерта! ДОБАВЛЕНО")
+                else:
+                    change_1h = ((current_price - price_1h_ago) / price_1h_ago) * 100
+                    
+                    if abs(change_1h) >= ALERT_THRESHOLD_STOCKS:
+                        alerts.append({
+                            'name': name, 'ticker': ticker,
+                            'current_price': current_price,
+                            'change': change_1h, 'type': 'stock'
+                        })
+                        state["last_alerts"][ticker] = {"price": current_price, "time": datetime.now().isoformat()}
+                        print(f"🚨 {name}: {change_1h:+.2f}% за час (ПЕРВЫЙ АЛЕРТ)! ДОБАВЛЕНО")
+                        
         except Exception as e:
-            print(f"️ Ошибка проверки {name}: {e}")
+            print(f"⚠️ Ошибка проверки {name}: {e}")
     
+    # Сохраняем обновлённое состояние в файл
+    save_state(state)
     return alerts
 
 # ==========================================
@@ -216,13 +284,12 @@ def analyze_causes_with_ai(alerts, news_data):
 
 ОТВЕТЬ ТОЛЬКО В ЭТОМ ФОРМАТЕ, БЕЗ ДОПОЛНИТЕЛЬНЫХ КОММЕНТАРИЕВ."""
     
-        # 🚀 СПИСОК ПРОВЕРЕННЫХ РАБОЧИХ МОДЕЛЕЙ ДЛЯ ЭКСТРЕННЫХ СИГНАЛОВ
     fire_spy_models = [
-        "inclusionai/ling-3.0-flash-fin:free",       # 🏆 Лучшая для финансов
-        "nvidia/nemotron-3-super-120b-a12b:free",    # 🚀 Мощная и быстрая
-        "google/gemma-4-31b-it:free",                # 🌟 От Google
-        "google/gemma-4-26b-a4b-it:free",            # ⚡ Очень быстрая
-        "nvidia/nemotron-3.5-lightning:free"         # ⚡ Молниеносная
+        "inclusionai/ling-3.0-flash-fin:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "google/gemma-4-31b-it:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "nvidia/nemotron-3.5-lightning:free"
     ]
     
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -231,7 +298,6 @@ def analyze_causes_with_ai(alerts, news_data):
         "Content-Type": "application/json"
     }
     
-    # Перебираем модели по очереди, пока одна не ответит успешно
     for model in fire_spy_models:
         try:
             payload = {
@@ -245,16 +311,13 @@ def analyze_causes_with_ai(alerts, news_data):
                 result = response.json()
                 if 'choices' in result and len(result['choices']) > 0:
                     content = result['choices'][0]['message']['content']
-                    # Проверяем, что ответ не пустой и не слишком короткий
                     if content and len(content.strip()) > 50:
                         print(f"✅ Успешный анализ через модель: {model}")
                         return content
-            # Если статус не 200 или ответ пустой, цикл автоматически перейдёт к следующей модели
             
         except Exception:
-            continue  # Игнорируем ошибку и пробуем следующую модель
+            continue
     
-    # Если все модели в списке не ответили, используем запасной вариант
     print("⚠️ Все модели OpenRouter недоступны, используем простой анализ новостей")
     return format_simple_causes(news_data)
 
@@ -267,9 +330,9 @@ def format_simple_causes(news_data):
     
     for category, news_list in news_data.items():
         category_name = {
-            'geopolitics': ' ГЕОПОЛИТИКА',
+            'geopolitics': '🌐 ГЕОПОЛИТИКА',
             'it_tech': '💻 IT И ТЕХНОЛОГИИ',
-            'finance': ' ФИНАНСЫ'
+            'finance': '📊 ФИНАНСЫ'
         }.get(category, category)
         
         if news_list:
@@ -339,132 +402,3 @@ def generate_alert_chart(alerts):
         buf = BytesIO()
         plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0d1117')
         buf.seek(0)
-        plt.close()
-        
-        return buf
-    except Exception as e:
-        print(f"⚠️ Ошибка генерации графика: {e}")
-        return None
-
-# ==========================================
-# 7. ОТПРАВКА СИГНАЛА
-# ==========================================
-def send_alert(alerts, chart_buffer, causes_text):
-    """Отправляет сигнал с анализом причин"""
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
-    
-    # Формируем список алертов с эмодзи
-    alerts_text = ""
-    for alert in alerts:
-        change_emoji = "🟢" if alert['change'] > 0 else "🔴"
-        alerts_text += f"{change_emoji} **{alert['name']}**: {alert['change']:+.2f}% (💰 цена: ${alert['current_price']:,.2f})\n"
-    
-    # Определяем общее направление
-    avg_change = sum(a['change'] for a in alerts) / len(alerts)
-    
-    # Формируем план действий с эмодзи
-    if avg_change < 0:
-        action_plan = """
-🎯 **ЧТО ДЕЛАТЬ:**
-• 🔻 Если в лонге: рассмотрите стоп-лосс ниже текущей цены (-3-5%)
-• 🔺 Если в шорте: зафиксируйте часть прибыли
-• ⏸️ Если вне рынка: не ловите падающий нож, ждите стабилизации
-•  Уменьшите размер позиций до прояснения ситуации
-"""
-    else:
-        action_plan = """
-🎯 **ЧТО ДЕЛАТЬ:**
-• 🔺 Если в шорте: рассмотрите стоп-лосс выше текущей цены (+3-5%)
-• 🔻 Если в лонге: зафиксируйте часть прибыли на сопротивлениях
-• ⏸️ Если вне рынка: не входите на хаях, ждите отката
-• 🚫 Не поддавайтесь FOMO, даже если рынок растёт
-"""
-    
-    alert_text = f"""
-🚨 **ПОЖАРНЫЙ ШПИОН: ЭКСТРЕННЫЙ СИГНАЛ** 🚨
-
-📊 **Обнаружены резкие движения рынка:**
-
-{alerts_text}
-📈 **ГРАФИК:** см. выше
-
-{causes_text}
-{action_plan}
-⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ:**
-Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью.
-
-️📜 **ДИСКЛЕЙМЕР:**
-⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль.
-"""
-    
-    # Отправляем график
-    if chart_buffer:
-        print("📊 Отправка графика...")
-        files = {
-            'photo': ('alert_chart.png', chart_buffer, 'image/png'),
-            'chat_id': (None, channel_id),
-            'caption': (None, "🚨💥 ПОЖАРНЫЙ ШПИОН: Экстренный сигнал"),
-            'parse_mode': (None, 'Markdown')
-        }
-        response = requests.post(
-            f"https://api.telegram.org/bot{bot_token}/sendPhoto",
-            files=files,
-            timeout=30
-        )
-        if response.status_code != 200:
-            print(f"⚠️ Ошибка отправки графика: {response.text}")
-        time.sleep(2)
-    
-    # Отправляем текст
-    print("📤 Отправка текста сигнала...")
-    text_payload = {
-        "chat_id": channel_id,
-        "text": alert_text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True
-    }
-    response = requests.post(
-        f"https://api.telegram.org/bot{bot_token}/sendMessage",
-        json=text_payload,
-        timeout=15
-    )
-    
-    if response.status_code == 200:
-        print(f"✅ Сигнал отправлен! ({len(alerts)} активов)")
-    else:
-        print(f"❌ Ошибка отправки: {response.text}")
-
-# ==========================================
-# 8. ГЛАВНЫЙ ЗАПУСК
-# ==========================================
-def main():
-    print("🔥 Запуск Пожарного Шпиона...")
-    print(f" Мониторинг: {len(CRYPTO_TICKERS)} крипто + {len(STOCK_TICKERS)} акций/сырья")
-    print(f"🚨 Порог: {ALERT_THRESHOLD_CRYPTO}% (крипта), {ALERT_THRESHOLD_STOCKS}% (акции)")
-    
-    if check_last_alert():
-        print("✅ Проверка завершена (сигнал не отправлен).")
-        return
-    
-    alerts = check_price_movements()
-    
-    if alerts:
-        print(f"🚨 Обнаружено {len(alerts)} резких движений!")
-        
-        print("📰 Сбор новостей (геополитика + IT + финансы)...")
-        news_data = get_all_news()
-        
-        print("🧠 ИИ-анализ причин скачка...")
-        causes_text = analyze_causes_with_ai(alerts, news_data)
-        
-        chart_buffer = generate_alert_chart(alerts)
-        
-        send_alert(alerts, chart_buffer, causes_text)
-    else:
-        print("✅ Резких движений не обнаружено. Молчим.")
-    
-    print("✅ Проверка завершена.")
-
-if __name__ == "__main__":
-    main()
