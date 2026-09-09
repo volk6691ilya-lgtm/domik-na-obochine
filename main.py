@@ -355,7 +355,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
                 result = response.json()
                 if 'choices' in result and len(result['choices']) > 0:
                     content = result['choices'][0]['message']['content']
-                                        if content and len(content.strip()) > 200:
+                    if content and len(content.strip()) > 200:
                         print(f"✅ ИИ-анализ успешно сгенерирован моделью: {model}")
                         return content
         except Exception:
