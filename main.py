@@ -155,6 +155,11 @@ def get_news_data():
             for entry in feed.entries[:3]:
                 title = entry.title
                 link = entry.get('link', '')
+
+                # ИСПРАВЛЕНО: пропускаем новости без ссылок или с подозрительными заголовками
+                if not link or len(title) < 20:
+                    continue
+                    
                 time_ago = format_time_ago(entry.get('published_parsed'))
                 title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
                 time_prefix = f"[{time_ago}] " if time_ago else ""
@@ -227,6 +232,9 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 3. НЕ используй символы ##, >, --- или таблицы.
 4. Сохраняй кликабельные ссылки в новостях в формате [текст](url).
 5. Пиши подробно, без воды, используй эмодзи для структуры.
+7. ВСЕ заголовки новостей должны быть ПЕРЕВЕДЕНЫ на русский язык
+8. НЕ сокращай блоки — пиши каждый раздел полноценно
+9. Обязательно используй переносы строк между абзацами!
 
 СТРУКТУРА ПОСТА (скопируй эти заголовки ровно в таком виде с жирным выделением):
 
