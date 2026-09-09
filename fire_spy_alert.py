@@ -402,3 +402,127 @@ def generate_alert_chart(alerts):
         buf = BytesIO()
         plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0d1117')
         buf.seek(0)
+        plt.close()
+        
+        return buf
+    except Exception as e:
+        print(f"⚠️ Ошибка генерации графика: {e}")
+        return None
+
+# ==========================================
+# 7. ОТПРАВКА СИГНАЛА
+# ==========================================
+def send_alert(alerts, chart_buffer, causes_text):
+    """Отправляет сигнал с анализом причин"""
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
+    
+    alerts_text = ""
+    for alert in alerts:
+        change_emoji = "🟢" if alert['change'] > 0 else "🔴"
+        alerts_text += f"{change_emoji} **{alert['name']}**: {alert['change']:+.2f}% (💰 цена: ${alert['current_price']:,.2f})\n"
+    
+    avg_change = sum(a['change'] for a in alerts) / len(alerts)
+    
+    if avg_change < 0:
+        action_plan = """
+🎯 **ЧТО ДЕЛАТЬ:**
+• 🔻 Если в лонге: рассмотрите стоп-лосс ниже текущей цены (-3-5%)
+• 🔺 Если в шорте: зафиксируйте часть прибыли
+• ⏸️ Если вне рынка: не ловите падающий нож, ждите стабилизации
+• 🛡️ Уменьшите размер позиций до прояснения ситуации
+"""
+    else:
+        action_plan = """
+🎯 **ЧТО ДЕЛАТЬ:**
+• 🔺 Если в шорте: рассмотрите стоп-лосс выше текущей цены (+3-5%)
+• 🔻 Если в лонге: зафиксируйте часть прибыли на сопротивлениях
+• ⏸️ Если вне рынка: не входите на хаях, ждите отката
+• 🚫 Не поддавайтесь FOMO, даже если рынок растёт
+"""
+    
+    alert_text = f"""
+🚨 **ПОЖАРНЫЙ ШПИОН: ЭКСТРЕННЫЙ СИГНАЛ** 🚨
+
+📊 **Обнаружены резкие движения рынка:**
+
+{alerts_text}
+📈 **ГРАФИК:** см. выше
+
+{causes_text}
+{action_plan}
+⚠️ **РИСК-ПРЕДУПРЕЖДЕНИЕ:**
+Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью.
+
+📜 **ДИСКЛЕЙМЕР:**
+⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль.
+"""
+    
+    if chart_buffer:
+        print("📊 Отправка графика...")
+        files = {
+            'photo': ('alert_chart.png', chart_buffer, 'image/png'),
+            'chat_id': (None, channel_id),
+            'caption': (None, "🚨💥 ПОЖАРНЫЙ ШПИОН: Экстренный сигнал"),
+            'parse_mode': (None, 'Markdown')
+        }
+        response = requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+            files=files,
+            timeout=30
+        )
+        if response.status_code != 200:
+            print(f"⚠️ Ошибка отправки графика: {response.text}")
+        time.sleep(2)
+    
+    print("📤 Отправка текста сигнала...")
+    text_payload = {
+        "chat_id": channel_id,
+        "text": alert_text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True
+    }
+    response = requests.post(
+        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+        json=text_payload,
+        timeout=15
+    )
+    
+    if response.status_code == 200:
+        print(f"✅ Сигнал отправлен! ({len(alerts)} активов)")
+    else:
+        print(f"❌ Ошибка отправки: {response.text}")
+
+# ==========================================
+# 8. ГЛАВНЫЙ ЗАПУСК
+# ==========================================
+def main():
+    print("🔥 Запуск Пожарного Шпиона v2.0 (с умной памятью цен)...")
+    print(f"📡 Мониторинг: {len(CRYPTO_TICKERS)} крипто + {len(STOCK_TICKERS)} акций/сырья")
+    print(f"🚨 Порог: {ALERT_THRESHOLD_CRYPTO}% (крипта), {ALERT_THRESHOLD_STOCKS}% (акции)")
+    
+    if check_last_alert():
+        print("✅ Проверка завершена (сигнал не отправлен из-за таймаута).")
+        return
+    
+    alerts = check_price_movements()
+    
+    if alerts:
+        print(f"🚨 Обнаружено {len(alerts)} резких движений!")
+        
+        print("📰 Сбор новостей (геополитика + IT + финансы)...")
+        news_data = get_all_news()
+        
+        print("🧠 ИИ-анализ причин скачка...")
+        causes_text = analyze_causes_with_ai(alerts, news_data)
+        
+        chart_buffer = generate_alert_chart(alerts)
+        
+        send_alert(alerts, chart_buffer, causes_text)
+    else:
+        print("✅ Резких движений не обнаружено. Молчим.")
+    
+    print("✅ Проверка завершена.")
+
+if __name__ == "__main__":
+    main()
