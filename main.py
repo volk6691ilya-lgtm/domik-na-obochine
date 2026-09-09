@@ -81,22 +81,92 @@ def get_global_data():
         return {'btc_dominance': 0, 'total_market_cap': 0, 'total_volume': 0}
 
 def get_crypto_data():
+    """Крипта с объемами торгов + автоматический фоллбэк на Binance"""
     try:
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,toncoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true"
-        response = requests.get(url, timeout=10).json()
-        data = []
+        response = requests.get(url, timeout=10)
+        
+        # Если CoinGecko вернул ошибку (например, 429 - лимит запросов)
+        if response.status_code != 200:
+            print(f"⚠️ CoinGecko вернул статус {response.status_code}, переключаюсь на Binance...")
+            send_error_alert(f"CoinGecko недоступен (статус {response.status_code}), использую Binance API")
+            return _get_crypto_from_binance()
+        
+        data = response.json()
+        
+        # Проверка на пустой ответ или ошибку в структуре JSON
+        if not data or 'bitcoin' not in data:
+            print("⚠️ CoinGecko вернул некорректный ответ, переключаюсь на Binance...")
+            send_error_alert("CoinGecko вернул пустой ответ, использую Binance API")
+            return _get_crypto_from_binance()
+        
+        result = []
         names = {"bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL", "ripple": "XRP", "toncoin": "TON"}
         for key, name in names.items():
-            if key in response:
-                price = response[key]['usd']
-                change = response[key]['usd_24h_change']
-                volume = response[key].get('usd_24h_vol', 0)
+            if key in data:
+                price = data[key]['usd']
+                change = data[key]['usd_24h_change']
+                volume = data[key].get('usd_24h_vol', 0)
                 vol_billion = volume / 1_000_000_000
-                data.append(f"• {name}: ${price:,.2f} ({change:+.2f}%) | Объем: ${vol_billion:.2f}B")
-        return "\n".join(data)
+                result.append(f"• {name}: ${price:,.2f} ({change:+.2f}%) | Объем: ${vol_billion:.2f}B")
+        
+        print("✅ Данные крипты получены через CoinGecko")
+        return "\n".join(result)
+        
     except Exception as e:
-        send_error_alert(f"Сбой CoinGecko Prices: {str(e)[:100]}")
-        return "• Крипта: Данные временно недоступны"
+        print(f"⚠️ CoinGecko полностью недоступен ({str(e)[:50]}), переключаюсь на Binance...")
+        send_error_alert(f"CoinGecko упал: {str(e)[:100]}. Переключаюсь на Binance.")
+        return _get_crypto_from_binance()
+
+
+def _get_crypto_from_binance():
+    """Резервный источник: Binance публичный API (не требует ключа, очень стабильный)"""
+    try:
+        # Запрашиваем данные сразу по всем нужным парам
+        url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","TONUSDT"]'
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code != 200:
+            print(f"❌ Binance API тоже вернул ошибку (статус {response.status_code})")
+            send_error_alert(f"ОБА источника крипты недоступны: CoinGecko и Binance (статус {response.status_code})")
+            return "• Крипта: Данные временно недоступны (оба API упали)"
+        
+        data = response.json()
+        if not isinstance(data, list):
+            return "• Крипта: Данные временно недоступны"
+        
+        result = []
+        # Маппинг символов Binance на наши короткие названия
+        symbol_map = {
+            "BTCUSDT": "BTC",
+            "ETHUSDT": "ETH",
+            "SOLUSDT": "SOL",
+            "XRPUSDT": "XRP",
+            "TONUSDT": "TON"
+        }
+        
+        for item in data:
+            symbol = item.get('symbol', '')
+            if symbol in symbol_map:
+                name = symbol_map[symbol]
+                price = float(item.get('lastPrice', 0))
+                change = float(item.get('priceChangePercent', 0))
+                volume = float(item.get('quoteVolume', 0))  # Объем торгов в USDT
+                vol_billion = volume / 1_000_000_000
+                
+                # Форматируем В ТОЧНОСТИ так же, как CoinGecko, чтобы ИИ ничего не заметил
+                result.append(f"• {name}: ${price:,.2f} ({change:+.2f}%) | Объем: ${vol_billion:.2f}B")
+        
+        if result:
+            print("✅ Данные крипты успешно получены через Binance API (резерв)")
+            return "\n".join(result)
+        else:
+            return "• Крипта: Данные временно недоступны"
+            
+    except Exception as e:
+        print(f"❌ Binance API тоже упал: {str(e)[:50]}")
+        send_error_alert(f"Binance API упал: {str(e)[:100]}")
+        return "• Крипта: Данные временно недоступны (оба API упали)"
 
 def get_support_resistance():
     try:
