@@ -23,9 +23,22 @@ jobs:
         run: |
           pip install yfinance requests feedparser matplotlib pandas
           
+      # 🧠 НОВОЕ: Восстанавливаем файл памяти из кэша перед запуском
+      - name: Restore spy state
+        uses: actions/cache@v3
+        with:
+          path: spy_state.json
+          key: ${{ runner.os }}-spy-state
+          restore-keys: |
+            ${{ runner.os }}-spy-state
+          
       - name: Run Fire Spy Monitor
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }} # Добавлено: нужно для ИИ-анализа причин
         run: |
           python fire_spy_alert.py
+          
+      # 💾 actions/cache автоматически сохранит обновленный spy_state.json в конце запуска, 
+      # если скрипт его изменил (после успешного алерта).
