@@ -10,23 +10,6 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 # ==========================================
-# 0. НАБЛЮДАЕМОСТЬ И МОНИТОРИНГ (НОВОЕ)
-# ==========================================
-def send_error_alert(message):
-    """Отправляет уведомление об ошибке в системный канал администратора"""
-    error_channel = os.environ.get("TELEGRAM_ERROR_CHANNEL_ID")
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if error_channel and bot_token:
-        try:
-            requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json={
-                "chat_id": error_channel,
-                "text": f"⚠️ **СИСТЕМНАЯ ОШИБКА EMBER WATCH:**\n`{message}`",
-                "parse_mode": "Markdown"
-            }, timeout=10)
-        except Exception:
-            pass  # Если не удалось отправить алерт, просто игнорируем, чтобы не ломать основной поток
-
-# ==========================================
 # 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА
 # ==========================================
 def get_session_info():
@@ -54,7 +37,7 @@ def get_session_info():
     }
 
 # ==========================================
-# 2. СБОР ДАННЫХ (С ЛОГИРОВАНИЕМ СБОЕВ)
+# 2. СБОР ДАННЫХ
 # ==========================================
 def get_fear_greed_index():
     try:
@@ -64,8 +47,7 @@ def get_fear_greed_index():
         classification = response['data'][0]['value_classification']
         return int(value), classification
     except Exception as e:
-        send_error_alert(f"Сбой источника: Fear & Greed Index\nОшибка: {str(e)[:100]}")
-        return 50, "Neutral"
+        return None, f"Ошибка: {str(e)[:20]}"
 
 def get_global_data():
     try:
@@ -78,16 +60,13 @@ def get_global_data():
             'total_volume': data.get('total_volume', {}).get('usd', 0) / 1_000_000_000
         }
     except Exception as e:
-        send_error_alert(f"Сбой источника: CoinGecko Global\nОшибка: {str(e)[:100]}")
         return {'btc_dominance': 0, 'total_market_cap': 0, 'total_volume': 0}
 
 def get_crypto_data():
     try:
-        # ИСПРАВЛЕНО: чистый URL без пробелов
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,toncoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true"
         response = requests.get(url, timeout=10).json()
         data = []
-        # ИСПРАВЛЕНО: чистые ключи без пробелов
         names = {"bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL", "ripple": "XRP", "toncoin": "TON"}
         for key, name in names.items():
             if key in response:
@@ -98,8 +77,7 @@ def get_crypto_data():
                 data.append(f"• {name}: ${price:,.2f} ({change:+.2f}%) | Объем: ${vol_billion:.2f}B")
         return "\n".join(data)
     except Exception as e:
-        send_error_alert(f"Сбой источника: CoinGecko Prices\nОшибка: {str(e)[:100]}")
-        return "• Крипта: Данные временно недоступны"
+        return f"• Крипта: Ошибка ({str(e)[:30]})"
 
 def get_support_resistance():
     try:
@@ -112,11 +90,9 @@ def get_support_resistance():
             return f"BTC: Поддержка ${low:,.0f} | Сопротивление ${high:,.0f} | Текущая ${close:,.0f}"
         return "BTC: Недоступно"
     except Exception as e:
-        send_error_alert(f"Сбой источника: Yahoo Finance (BTC)\nОшибка: {str(e)[:100]}")
-        return "BTC: Данные недоступны"
+        return f"BTC: Ошибка ({str(e)[:30]})"
 
 def get_finance_data():
-    # ИСПРАВЛЕНО: чистые ключи без пробелов
     tickers = {
         "GC=F": "Золото",
         "SI=F": "Серебро",
@@ -140,7 +116,7 @@ def get_finance_data():
                 data.append(f"• {name}: ${price:,.2f} (изменение недоступно)")
             else:
                 data.append(f"• {name}: данных нет")
-        except Exception:
+        except Exception as e:
             data.append(f"• {name}: данных нет")
     return "\n".join(data)
 
@@ -179,8 +155,11 @@ def get_news_data():
             for entry in feed.entries[:3]:
                 title = entry.title
                 link = entry.get('link', '')
+
+                # ИСПРАВЛЕНО: пропускаем новости без ссылок или с подозрительными заголовками
                 if not link or len(title) < 20:
                     continue
+                    
                 time_ago = format_time_ago(entry.get('published_parsed'))
                 title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
                 time_prefix = f"[{time_ago}] " if time_ago else ""
@@ -190,11 +169,10 @@ def get_news_data():
                     headlines.append(f"• {time_prefix}{title_safe}")
         return "\n".join(headlines[:5])
     except Exception as e:
-        send_error_alert(f"Сбой источника: RSS Новости\nОшибка: {str(e)[:100]}")
         return "• Новости: Ошибка сбора данных"
 
 # ==========================================
-# 3. ИИ-АНАЛИЗ (С ЛОГИРОВАНИЕМ УСПЕШНОЙ МОДЕЛИ)
+# 3. ИИ-АНАЛИЗ (ВОССТАНОВЛЕННЫЙ И ИСПРАВЛЕННЫЙ ПРОМПТ)
 # ==========================================
 def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news):
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -231,6 +209,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     else:
         fg_emoji, fg_signal = "🤑", "ЭКСТРЕМАЛЬНАЯ ЖАДНОСТЬ"
     
+    # ИСПРАВЛЕНО: Идеально чистые примеры с ** в начале и в конце, без пробелов внутри
     prompt = f"""Ты — профессиональный ИИ-аналитик финансовых рынков. Создай ОБЪЕКТИВНЫЙ обзор рынка для Telegram-канала.
 
 КОНТЕКСТ:
@@ -248,13 +227,16 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 [НОВОСТИ]: {news}
 
 ⚠️ КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:
-1. ВСЕ заголовки разделов должны быть выделены жирным шрифтом с помощью двойных звездочек. Пример: **🪙 1. КРИПТОРЫНОК**
+1. ВСЕ заголовки разделов должны быть выделены жирным шрифтом с помощью двойных звездочек в начале и в конце. Пример: **🪙 1. КРИПТОРЫНОК**
 2. НЕ добавляй звездочки в обычный текст внутри разделов (только для заголовков!).
 3. НЕ используй символы ##, >, --- или таблицы.
 4. Сохраняй кликабельные ссылки в новостях в формате [текст](url).
 5. Пиши подробно, без воды, используй эмодзи для структуры.
+7. ВСЕ заголовки новостей должны быть ПЕРЕВЕДЕНЫ на русский язык
+8. НЕ сокращай блоки — пиши каждый раздел полноценно
+9. Обязательно используй переносы строк между абзацами!
 
-СТРУКТУРА ПОСТА (ВСЕ БЛОКИ ОБЯЗАТЕЛЬНЫ):
+СТРУКТУРА ПОСТА (скопируй эти заголовки ровно в таком виде с жирным выделением):
 
 **📊 ИИ АНАЛИТИК: {session_info['name']} ОБЗОР — {session_info['date']}**
 
@@ -281,8 +263,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 
 **🌐 4. ГЕОПОЛИТИКА**
 - Новости из блока [НОВОСТИ] (регуляция, законы, санкции)
-- ВСЕ ЗАГОЛОВКИ НОВОСТЕЙ ДОЛЖНЫ БЫТЬ НА РУССКОМ ЯЗЫКЕ!
-- СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ [текст](url)
+- СОХРАНЯЙ КЛИКАБЕЛЬНЫЕ ССЫЛКИ [текст](url) — НЕ ПЕРЕПИСЫВАЙ ЗАГОЛОВКИ!
 - Временные метки [X ч. назад]
 - Влияние на рынки
 
@@ -291,7 +272,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - Новости про ETF, биржи, институционалов
 - Анализ: куда движется "умный капитал"
 
-**🔗 СВЯЗЬ ВЕТОК:**
+**🔗 СВЯЗЬ ВЕТОК**
 - Как геополитика/IT влияют на крипту
 - Комплексный вывод: что это значит для рынка
 
@@ -356,18 +337,10 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
                 if 'choices' in result and len(result['choices']) > 0:
                     content = result['choices'][0]['message']['content']
                     if content and len(content.strip()) > 200:
-                        # 🎯 НОВОЕ: Логируем успешную модель
-                        print(f"✅ ИИ-анализ успешно сгенерирован моделью: {model}")
                         return content
-            elif response.status_code == 429:
-                print(f"⏳ Модель {model} перегружена (429), пробую следующую...")
-                continue
-        except Exception as e:
-            print(f"⚠️ Ошибка модели {model}: {str(e)[:50]}, пробую следующую...")
+        except Exception:
             continue
     
-    # 🎯 НОВОЕ: Алерт, если все модели упали
-    send_error_alert("КРИТИЧЕСКИЙ СБОЙ: Все 11 ИИ-моделей OpenRouter недоступны или вернули пустой ответ.")
     return None
 
 # ==========================================
@@ -417,7 +390,7 @@ def smart_split_text(text, max_len=3800):
     return parts
 
 # ==========================================
-# 6. КАРТИНКИ (CLOUDINARY)
+# 6. КОЛЛЕКЦИЯ КАРТИНОК (CLOUDINARY)
 # ==========================================
 COVER_IMAGES = {
     'bullish': [
@@ -476,14 +449,14 @@ def get_cover_image(fear_greed):
         return None
 
 # ==========================================
-# 7. ОТПРАВКА В TELEGRAM (С ЛОГИРОВАНИЕМ)
+# 7. ОТПРАВКА В TELEGRAM
 # ==========================================
 def send_to_telegram(text, fear_greed=None):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
     if not bot_token or not channel_id:
-        send_error_alert("КРИТИЧЕСКИЙ СБОЙ: Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
+        print("❌ Ошибка: токены не установлены")
         return
     
     print("🖼️ Выбор картинки из коллекции...")
@@ -491,7 +464,7 @@ def send_to_telegram(text, fear_greed=None):
     
     if image_buffer:
         print("📤 Отправка картинки...")
-        caption = "💼 **ИИ АНАЛИТИК НА СВЯЗИ**\n\nСистема завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
+        caption = "💼 ИИ АНАЛИТИК НА СВЯЗИ \n\n Система завершила анализ 5 ветвей рынка. Полный разбор ниже 👇"
         
         files = {
             'photo': ('cover.jpg', image_buffer, 'image/jpeg'),
@@ -499,11 +472,16 @@ def send_to_telegram(text, fear_greed=None):
             'caption': (None, caption)
         }
         
-        response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", files=files, timeout=30)
+        response = requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+            files=files,
+            timeout=30
+        )
+        
         if response.status_code == 200:
             print("✅ Картинка успешно отправлена в Telegram!")
         else:
-            send_error_alert(f"Ошибка отправки картинки в Telegram: {response.text}")
+            print(f"❌ Ошибка отправки картинки: {response.text}")
         time.sleep(2)
     else:
         print("⚠️ Картинка не получена, отправляем только текст...")
@@ -533,17 +511,22 @@ def send_to_telegram(text, fear_greed=None):
             "disable_web_page_preview": True
         }
         
-        response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=text_payload, timeout=15)
+        response = requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json=text_payload,
+            timeout=15
+        )
+        
         if response.status_code == 200:
             print(f"✅ Часть {i+1}/{total_parts} отправлена! (длина: {len(part_with_indicator)})")
         else:
-            send_error_alert(f"Ошибка отправки части {i+1} текста в Telegram: {response.text}")
+            print(f"❌ Ошибка части {i+1}: {response.text}")
 
 # ==========================================
 # 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v32.0 (Наблюдаемость + Мониторинг ошибок)...")
+    print("🚀 Запуск ИИ Аналитика v31.7 (Восстановлен идеальный промпт + исправлены технические ошибки)...")
     
     print("📡 Определение типа выпуска...")
     session_info = get_session_info()
@@ -564,7 +547,6 @@ def main():
         
         if not analysis or len(analysis.strip()) < 200:
             print("⚠️ ИИ вернул пустой или слишком короткий ответ. Используем резервный текст.")
-            send_error_alert("ИИ вернул пустой ответ, активирован резервный шаблон.")
             fg_value = fear_greed[0] if fear_greed and fear_greed[0] is not None else 50
             fg_class = fear_greed[1] if fear_greed and len(fear_greed) > 1 else "Neutral"
             analysis = f"""⚠️ **Внимание:** Сервисы ИИ-анализа временно перегружены. Система не смогла сгенерировать подробный обзор, но свежие данные ниже абсолютно актуальны.
@@ -580,7 +562,6 @@ def main():
 🔍 Полный анализ с торговыми идеями будет в следующем выпуске."""
     except Exception as e:
         print(f"❌ Ошибка ИИ-анализа: {e}")
-        send_error_alert(f"Критическая ошибка в блоке ИИ-анализа: {str(e)}")
         fg_value = fear_greed[0] if fear_greed and fear_greed[0] is not None else 50
         fg_class = fear_greed[1] if fear_greed and len(fear_greed) > 1 else "Neutral"
         analysis = f"""⚠️ **Внимание:** Произошла техническая ошибка при генерации анализа. Свежие данные ниже актуальны.
@@ -602,6 +583,5 @@ def main():
     send_to_telegram(full_text, fear_greed)
     print("✅ Миссия выполнена.")
 
-# ИСПРАВЛЕНО: правильное написание магической переменной Python
 if __name__ == "__main__":
     main()
