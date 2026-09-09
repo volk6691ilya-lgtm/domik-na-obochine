@@ -10,6 +10,23 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 # ==========================================
+# 0. НАБЛЮДАЕМОСТЬ (НОВОЕ)
+# ==========================================
+def send_error_alert(message):
+    """Отправляет уведомление об ошибке в системный канал"""
+    error_channel = os.environ.get("TELEGRAM_ERROR_CHANNEL_ID")
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if error_channel and bot_token:
+        try:
+            requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json={
+                "chat_id": error_channel,
+                "text": f"⚠️ **СИСТЕМНАЯ ОШИБКА:**\n`{message}`",
+                "parse_mode": "Markdown"
+            }, timeout=10)
+        except Exception:
+            pass  # Не ломаем основной поток, если алерт не отправился
+
+# ==========================================
 # 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА
 # ==========================================
 def get_session_info():
@@ -47,7 +64,8 @@ def get_fear_greed_index():
         classification = response['data'][0]['value_classification']
         return int(value), classification
     except Exception as e:
-        return None, f"Ошибка: {str(e)[:20]}"
+        send_error_alert(f"Сбой Fear & Greed Index: {str(e)[:100]}")
+        return 50, "Neutral"
 
 def get_global_data():
     try:
@@ -77,7 +95,8 @@ def get_crypto_data():
                 data.append(f"• {name}: ${price:,.2f} ({change:+.2f}%) | Объем: ${vol_billion:.2f}B")
         return "\n".join(data)
     except Exception as e:
-        return f"• Крипта: Ошибка ({str(e)[:30]})"
+        send_error_alert(f"Сбой CoinGecko Prices: {str(e)[:100]}")
+        return "• Крипта: Данные временно недоступны"
 
 def get_support_resistance():
     try:
@@ -336,11 +355,13 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
                 result = response.json()
                 if 'choices' in result and len(result['choices']) > 0:
                     content = result['choices'][0]['message']['content']
-                    if content and len(content.strip()) > 200:
+                                        if content and len(content.strip()) > 200:
+                        print(f"✅ ИИ-анализ успешно сгенерирован моделью: {model}")
                         return content
         except Exception:
             continue
     
+        send_error_alert("КРИТИЧЕСКИЙ СБОЙ: Все 11 ИИ-моделей недоступны.")
     return None
 
 # ==========================================
@@ -456,7 +477,7 @@ def send_to_telegram(text, fear_greed=None):
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
     if not bot_token or not channel_id:
-        print("❌ Ошибка: токены не установлены")
+        send_error_alert("КРИТИЧЕСКИЙ СБОЙ: Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
         return
     
     print("🖼️ Выбор картинки из коллекции...")
