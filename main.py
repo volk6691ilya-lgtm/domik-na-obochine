@@ -254,7 +254,6 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 7. ВСЕ заголовки новостей должны быть ПЕРЕВЕДЕНЫ на русский язык.
 8. НЕ сокращай блоки — пиши каждый раздел полноценно
 9. Обязательно используй переносы строк между абзацами!
-10. Отслеживать переносы, если начало блока или заголовка новостей попадает в конец, перенести в другой пост целиком.
 
 СТРУКТУРА ПОСТА (скопируй эти заголовки ровно в таком виде с жирным выделением):
 
@@ -392,22 +391,106 @@ def get_post_footer(session_info):
 # 5. УМНОЕ РАЗДЕЛЕНИЕ НА ЧАСТИ
 # ==========================================
 def smart_split_text(text, max_len=3800):
-    paragraphs = text.split('\n\n')
-    parts = []
-    current_part = ""
+    """
+    Разбивает текст на части, НЕ разрывая:
+    1. Целые разделы (🪙 1. КРИПТОРЫНОК, 🌐 4. ГЕОПОЛИТИКА и т.д.)
+    2. Отдельные новости (заголовок + ссылка)
+    3. Абзацы внутри разделов
+    """
+    # Шаг 1: Разбиваем текст на логические разделы
+    sections = []
+    current_section = []
     
-    for para in paragraphs:
-        if not para.strip():
-            continue
-        if len(current_part) + len(para) + 2 <= max_len:
-            current_part += para + "\n\n"
+    for line in text.split('\n'):
+        # Проверяем, начинается ли строка с заголовка раздела
+        is_section_header = any([
+            '🪙 **1.' in line,
+            '🛢️ **2.' in line,
+            '🌍 **3.' in line,
+            '🌐 **4.' in line or '🌐 4.' in line,
+            '💻 **5.' in line or '💻 5.' in line,
+            '🔗 **' in line,
+            ' **' in line,
+            ' **' in line,
+            '️ **' in line,
+            '️ **' in line,
+            ' **ИИ АНАЛИТИК' in line,
+            '📈 **ПЕРИОД' in line,
+        ])
+        
+        if is_section_header and current_section:
+            # Сохраняем предыдущий раздел
+            sections.append('\n'.join(current_section))
+            current_section = [line]
         else:
-            if current_part.strip():
-                parts.append(current_part.strip())
-            current_part = para + "\n\n"
+            current_section.append(line)
     
-    if current_part.strip():
-        parts.append(current_part.strip())
+    # Добавляем последний раздел
+    if current_section:
+        sections.append('\n'.join(current_section))
+    
+    # Шаг 2: Собираем части, не разрывая разделы
+    parts = []
+    current_part = []
+    current_length = 0
+    
+    for section in sections:
+        section_length = len(section) + 2  # +2 для \n\n
+        
+        # Если раздел помещается в текущую часть
+        if current_length + section_length <= max_len:
+            current_part.append(section)
+            current_length += section_length
+        else:
+            # Если текущая часть не пустая — сохраняем её
+            if current_part:
+                parts.append('\n\n'.join(current_part).strip())
+                current_part = []
+                current_length = 0
+            
+            # Если раздел слишком большой для одной части — разбиваем его по абзацам
+            if section_length > max_len:
+                paragraphs = section.split('\n\n')
+                for para in paragraphs:
+                    para_length = len(para) + 2
+                    if para_length <= max_len:
+                        if current_length + para_length <= max_len:
+                            current_part.append(para)
+                            current_length += para_length
+                        else:
+                            if current_part:
+                                parts.append('\n\n'.join(current_part).strip())
+                                current_part = [para]
+                                current_length = para_length + 2
+                            else:
+                                current_part = [para]
+                                current_length = para_length
+                    else:
+                        # Если абзац слишком большой — режем по строкам
+                        lines = para.split('\n')
+                        temp_para = []
+                        temp_length = 0
+                        for line in lines:
+                            line_length = len(line) + 1
+                            if temp_length + line_length <= max_len:
+                                temp_para.append(line)
+                                temp_length += line_length
+                            else:
+                                if temp_para:
+                                    parts.append('\n'.join(temp_para).strip())
+                                temp_para = [line]
+                                temp_length = line_length
+                        if temp_para:
+                            current_part.append('\n'.join(temp_para))
+                            current_length = sum(len(p) for p in current_part) + len(current_part) * 2
+            else:
+                # Раздел помещается целиком в новую часть
+                current_part = [section]
+                current_length = section_length
+    
+    # Добавляем последнюю часть
+    if current_part:
+        parts.append('\n\n'.join(current_part).strip())
     
     return parts
 
