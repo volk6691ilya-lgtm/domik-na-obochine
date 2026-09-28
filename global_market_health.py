@@ -11,7 +11,6 @@ class MarketHealthChecker:
     """
 
     def __init__(self):
-        # Ключ берется из GitHub Secrets. Для локального теста можно прописать вручную, но не коммитьте его!
         self.api_key = os.getenv("CMC_API_KEY") 
         self.url = "https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest"
         self.headers = {
@@ -20,10 +19,6 @@ class MarketHealthChecker:
         }
 
     def get_market_regime(self):
-        """
-        Анализирует изменение общей капитализации и объемов за 24 часа.
-        Возвращает режим рынка и проценты изменения.
-        """
         if not self.api_key:
             logging.warning("CMC_API_KEY не найден. Использую режим по умолчанию.")
             return "⚪ НЕИЗВЕСТНО (Нет API ключа)", 0.0, 0.0
@@ -32,17 +27,17 @@ class MarketHealthChecker:
             response = requests.get(self.url, headers=self.headers, timeout=10)
             response.raise_for_status()
             data = response.json()["data"]
-            
-            # Получаем процентные изменения за 24 часа в USD
             quote = data["quote"]["USD"]
-            cap_change = quote["total_market_cap"]["percent_change_24h"]
-            vol_change = quote["total_volume_24h"]["percent_change_24h"]
+            
+            # ИСПРАВЛЕННЫЕ КЛЮЧИ на основе реальной диагностики API:
+            cap_change = quote.get("total_market_cap_yesterday_percentage_change", 0.0)
+            vol_change = quote.get("total_volume_24h_yesterday_percentage_change", 0.0)
 
             # Логика из PDF "Определение движения рынка с помощью объёмов"
             if cap_change > 0 and vol_change > 0:
                 regime = "🟢 LONG (Рынок здоров, рост подтвержден объемами)"
             elif cap_change > 0 and vol_change < 0:
-                regime = "🟡 RETEST (Рост на исходе, возможен откат/смена тренда)"
+                regime = "🟡 RETEST (Рост на исходе, возможен откат)"
             elif cap_change < 0 and vol_change > 0:
                 regime = "🔴 SHORT (Агрессивные продажи, паника, объем на падении)"
             else: # cap_change < 0 and vol_change < 0
