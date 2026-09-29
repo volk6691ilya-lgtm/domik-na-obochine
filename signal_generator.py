@@ -13,7 +13,6 @@ import numpy as np
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 15 самых ликвидных монет
 SCAN_COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
     "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
@@ -21,7 +20,6 @@ SCAN_COINS = [
 ]
 
 def get_historical_data(symbol: str, timeframe: str = "1h", limit: int = 100) -> pd.DataFrame:
-    """Получает свечи через Binance API"""
     try:
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={timeframe}&limit={limit}"
         response = requests.get(url, timeout=10)
@@ -44,7 +42,6 @@ def get_historical_data(symbol: str, timeframe: str = "1h", limit: int = 100) ->
         return pd.DataFrame()
 
 def evaluate_signal_quality(ta_data: dict) -> tuple:
-    """Оценивает качество сигнала и возвращает (уровень, emoji, описание)"""
     try:
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
         rr_value = float(rr_str)
@@ -54,19 +51,18 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
     if rr_value >= 1.5 and volume_confirmed:
-        return ("high", "", "Высоковероятный сигнал")
+        return ("high", "🟢", "Высоковероятный сигнал")
     elif rr_value >= 1.2 and volume_confirmed:
         return ("medium", "🟡", "Средняя вероятность")
     elif rr_value >= 1.5 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else:
-        return ("low", "", "Низкая вероятность — лучше воздержаться")
+        return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
 
 def generate_analysis_post(symbol: str, ta_data: dict, pattern_data: dict, 
                           macro_regime: str, macro_warning: str, quality_level: str,
                           quality_emoji: str, quality_desc: str) -> str:
-    """Формирует детальный анализ с оценкой качества"""
-    direction = " ЛОНГ" if "Бычий" in ta_data['trend'] else "🔴 ШОРТ"
+    direction = "🟢 ЛОНГ" if "Бычий" in ta_data['trend'] else "🔴 ШОРТ"
     coin_name = symbol.replace('USDT', '')
     
     try:
@@ -74,7 +70,6 @@ def generate_analysis_post(symbol: str, ta_data: dict, pattern_data: dict,
     except:
         rr_value = "N/A"
     
-    # Рекомендация в зависимости от качества
     if quality_level == "high":
         recommendation = "✅ Сигнал соответствует всем критериям. Можно рассматривать вход."
     elif quality_level == "medium":
@@ -121,7 +116,6 @@ def generate_analysis_post(symbol: str, ta_data: dict, pattern_data: dict,
     return post
 
 def send_to_telegram(text: str, chart_path: str):
-    """Отправляет анализ в Telegram (текст + график)"""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
@@ -142,52 +136,52 @@ def send_to_telegram(text: str, chart_path: str):
                 files=files,
                 timeout=30
             )
-            
         if response.status_code == 200:
             logging.info("✅ Анализ успешно отправлен в Telegram!")
         else:
             logging.error(f"❌ Ошибка Telegram: {response.text}")
-            
     except Exception as e:
         logging.error(f"❌ Ошибка отправки: {e}")
 
 def main():
-    logging.info("🌙 Запуск Лунного Дозора: Анализ рынка v2.2 (обязательный пост)")
+    logging.info("🌙 Запуск Лунного Дозора: Анализ рынка v2.3 (Тотальное логирование)")
     
-    # 1. Макро-фильтр
     health_checker = MarketHealthChecker()
     regime, cap_chg, vol_chg = health_checker.get_market_regime()
     logging.info(f"Глобальный режим рынка: {regime}")
     
-    # 2. Макро-календарь
     macro_calendar = MacroCalendar()
     macro_warning = macro_calendar.get_warning_message()
     
-    # 3. Сканирование 15 монет
     ta_engine = TAEngine()
     pattern_recognizer = PatternRecognizer(lookback=20)
     visualizer = ChartVisualizer()
     
     best_coin = None
-    best_score = -1  # Будем искать монету с лучшим R:R
+    best_score = -1.0
     
     for coin in SCAN_COINS:
-        logging.info(f"Анализ {coin}...")
+        logging.info(f"🔍 Начинаем анализ {coin}...")
         df = get_historical_data(coin, timeframe="1h", limit=100)
+        
         if df.empty:
+            logging.info(f"⏭️ {coin}: Пропуск (пустые данные от биржи)")
             continue
             
         ta_data = ta_engine.analyze(df)
-        if "error" in ta_data:
-            logging.warning(f"⚠️ TA Engine вернул ошибку для {coin}: {ta_data['error']}")
+        logging.info(f"📊 {coin}: TA вернул ключи: {list(ta_data.keys()) if isinstance(ta_data, dict) else 'НЕ DICT'}")
+        
+        if isinstance(ta_data, dict) and "error" in ta_data:
+            logging.warning(f"⚠️ {coin}: Ошибка в TA Engine - {ta_data['error']}")
             continue
             
+        if not isinstance(ta_data, dict) or "price" not in ta_data:
+            logging.warning(f"⚠️ {coin}: Неверный формат данных от TA Engine")
+            continue
+
         pattern_data = pattern_recognizer.analyze_patterns(df)
+        quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
-        # Оцениваем качество
-        quality_level, _, _ = evaluate_signal_quality(ta_data)
-        
-        # Считаем "очки" для сравнения монет
         try:
             rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
             rr_value = float(rr_str)
@@ -196,7 +190,9 @@ def main():
         
         score = rr_value
         if "Да ✅" in ta_data['volume_confirmed']:
-            score += 0.5  # Бонус за подтверждение объемом
+            score += 0.5
+        
+        logging.info(f"✅ {coin}: Успешно! Score: {score} (R:R: {rr_value})")
         
         if score > best_score:
             best_score = score
@@ -205,16 +201,14 @@ def main():
                 "ta": ta_data,
                 "patterns": pattern_data,
                 "df": df,
-                "quality": quality_level
+                "quality_level": quality_level,
+                "quality_emoji": quality_emoji,
+                "quality_desc": quality_desc
             }
     
-    # 4. ВСЕГДА отправляем анализ лучшей монеты
     if best_coin:
-        logging.info(f"✅ Лучшая монета: {best_coin['symbol']} (score: {best_score})")
+        logging.info(f"🏆 Лучшая монета: {best_coin['symbol']} (Score: {best_score})")
         
-        quality_level, quality_emoji, quality_desc = evaluate_signal_quality(best_coin['ta'])
-        
-        # Генерируем график
         chart_path = visualizer.generate_signal_chart(
             best_coin['df'], 
             best_coin['symbol'], 
@@ -229,15 +223,15 @@ def main():
                 best_coin['patterns'],
                 regime,
                 macro_warning,
-                quality_level,
-                quality_emoji,
-                quality_desc
+                best_coin['quality_level'],
+                best_coin['quality_emoji'],
+                best_coin['quality_desc']
             )
             send_to_telegram(post_text, chart_path)
         else:
-            logging.warning("Не удалось создать график.")
+            logging.warning("⚠️ Не удалось создать график, но данные готовы.")
     else:
-        logging.error("❌ Не удалось проанализировать ни одну монету.")
+        logging.error("❌ КРИТИЧЕСКИЙ СБОЙ: Цикл завершен, но best_coin остался None. Проверь логи выше.")
 
 if __name__ == "__main__":
     main()
