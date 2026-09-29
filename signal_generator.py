@@ -179,6 +179,7 @@ def main():
             
         ta_data = ta_engine.analyze(df)
         if "error" in ta_data:
+            logging.warning(f"⚠️ TA Engine вернул ошибку для {coin}: {ta_data['error']}")
             continue
             
         pattern_data = pattern_recognizer.analyze_patterns(df)
