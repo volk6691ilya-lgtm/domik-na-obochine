@@ -1,5 +1,6 @@
 import os
 import requests
+import json
 import logging
 from datetime import datetime, timezone, timedelta
 from multi_exchange_aggregator import ExchangeAggregator
@@ -13,14 +14,60 @@ import numpy as np
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Монеты для сканирования (выбраны из PDF "Портфели" для разнообразия секторов)
-SCAN_COINS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "FETUSDT", "ARBUSDT"]
+# 15 самых ликвидных монет из всех портфелей PDF
+SCAN_COINS = [
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
+    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
+    "NEARUSDT", "UNIUSDT", "AAVEUSDT", "FETUSDT", "ARBUSDT"
+]
+
+# Файл для хранения последних сигналов (защита от дубликатов)
+LAST_SIGNALS_FILE = "last_signals.json"
+
+def load_last_signals():
+    """Загружает историю последних сигналов"""
+    try:
+        if os.path.exists(LAST_SIGNALS_FILE):
+            with open(LAST_SIGNALS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {"signals": []}
+
+def save_last_signals(data):
+    """Сохраняет историю сигналов"""
+    try:
+        with open(LAST_SIGNALS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Ошибка сохранения истории: {e}")
+
+def is_duplicate_signal(symbol, direction):
+    """Проверяет, не отправляли ли мы уже такой сигнал"""
+    history = load_last_signals()
+    now = datetime.now().isoformat()
+    
+    # Удаляем старые сигналы (старше 24 часов)
+    cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
+    history["signals"] = [s for s in history["signals"] if s["time"] > cutoff]
+    
+    # Проверяем дубликат
+    for signal in history["signals"]:
+        if signal["symbol"] == symbol and signal["direction"] == direction:
+            return True
+    
+    # Добавляем новый сигнал
+    history["signals"].append({
+        "symbol": symbol,
+        "direction": direction,
+        "time": now
+    })
+    
+    save_last_signals(history)
+    return False
 
 def get_historical_data(symbol: str, timeframe: str = "1h", limit: int = 100) -> pd.DataFrame:
-    """Получает свечи через агрегатор (Bybit с фоллбэком на Binance)"""
-    aggregator = ExchangeAggregator()
-    # Примечание: в реальном коде multi_exchange_aggregator должен возвращать OHLCV. 
-    # Для простоты здесь мы эмулируем запрос к Binance API, так как он стабильнее для исторических данных без ключей.
+    """Получает свечи через Binance API"""
     try:
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={timeframe}&limit={limit}"
         response = requests.get(url, timeout=10)
@@ -42,31 +89,48 @@ def get_historical_data(symbol: str, timeframe: str = "1h", limit: int = 100) ->
         logging.error(f"Ошибка получения данных для {symbol}: {e}")
         return pd.DataFrame()
 
-def generate_signal_post(symbol: str, ta_data: dict, pattern_data: dict, macro_warning: str, chart_path: str) -> str:
-    """Формирует финальный текст сигнала по правилам из PDF (РММ, Текпрофит)"""
+def generate_detailed_signal(symbol: str, ta_data: dict, pattern_data: dict, macro_regime: str, macro_warning: str, chart_path: str) -> str:
+    """Формирует детальный торговый план с дисклеймером"""
     direction = "🟢 ЛОНГ" if "Бычий" in ta_data['trend'] else "🔴 ШОРТ"
+    coin_name = symbol.replace('USDT', '')
     
-    post = f"""🚀 **ТОРГОВЫЙ СИГНАЛ: {symbol.replace('USDT', '')}**
+    # Извлекаем R:R
+    try:
+        rr_value = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
+    except:
+        rr_value = "N/A"
+    
+    post = f""" **ТОРГОВЫЙ ПЛАН: {coin_name}**
 
-📊 **Технический анализ:**
+📊 **МАКРО-КОНТЕКСТ:**
+• Глобальный режим: {macro_regime}
+{macro_warning if macro_warning else '• Макро-событий в ближайшие 24 часа не ожидается'}
+
+📈 **ТЕХНИЧЕСКАЯ КАРТИНА:**
 • Тренд: {ta_data['trend']}
-• Паттерн: {', '.join(pattern_data['patterns'])}
+• Импульс: {ta_data['momentum']}
+• MACD: {ta_data['macd']}
 • Объем (PVT): {ta_data['volume_confirmed']}
-• R:R (Риск/Прибыль): {ta_data['estimated_R:R']}
+• Паттерн: {', '.join(pattern_data['patterns'])}
 
-🎯 **Параметры сделки:**
+🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
+• Направление: {direction}
 • Точка входа: ~${ta_data['price']}
 • 🛑 Stop Loss: ${ta_data['support_level (SL)']}
 • 💰 Take Profit: ${ta_data['resistance_level (TP)']}
+• Соотношение Риск/Прибыль: **1:{rr_value}**
 
-{macro_warning if macro_warning else '🌍 **Макро-фон:** Спокойный, штормов не ожидается.'}
+💡 **ОБОСНОВАНИЕ:**
+{'Рост подтвержден объемом и бычьим трендом. ' if 'Бычий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Падение подтверждено объемом и медвежьим трендом. ' if 'Медвежий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Движение не подтверждено объемом — повышенный риск. '}
+{f'Обнаружен паттерн {pattern_data["patterns"][0]}, что усиливает сигнал.' if pattern_data['patterns'] and 'не обнаружено' not in pattern_data['patterns'][0] else ''}
 
-⚠️ **ПРАВИЛА РИСК-МЕНЕДЖМЕНТА (из PDF):**
-1. Не рискуйте более **5%** от депозита на одну сделку.
-2. Обязательно используйте Stop Loss.
-3. Соотношение риск/прибыль должно быть ≥ 1:2 (текущее: {ta_data['estimated_R:R'].split(':')[1].strip().split()[0]}).
+⚠️ **РИСК-МЕНЕДЖМЕНТ:**
+• Не рискуйте более **5%** от депозита на одну сделку
+• Обязательно используйте Stop Loss
+• Соотношение риск/прибыль должно быть ≥ 1:2 (текущее: 1:{rr_value})
 
-📜 *DYOR: Это не финансовая рекомендация. Проводите собственный анализ.*
+📜 **ДИСКЛЕЙМЕР:**
+⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль.
 """
     return post
 
@@ -80,7 +144,7 @@ def send_to_telegram(text: str, chart_path: str):
         return
 
     try:
-        # Сначала отправляем картинку с текстом в caption
+        # Отправляем картинку с текстом в caption
         with open(chart_path, 'rb') as f:
             files = {
                 'photo': ('signal_chart.png', f, 'image/png'),
@@ -103,7 +167,7 @@ def send_to_telegram(text: str, chart_path: str):
         logging.error(f"❌ Ошибка отправки: {e}")
 
 def main():
-    logging.info("🌙 Запуск Лунного Дозора: Генератор Сигналов v2.0")
+    logging.info("🌙 Запуск Лунного Дозора: Генератор Сигналов v2.1 (15 монет)")
     
     # 1. Макро-фильтр (Светофор)
     health_checker = MarketHealthChecker()
@@ -114,7 +178,7 @@ def main():
     macro_calendar = MacroCalendar()
     macro_warning = macro_calendar.get_warning_message()
     
-    # 3. Сканирование монет
+    # 3. Сканирование 15 монет
     ta_engine = TAEngine()
     pattern_recognizer = PatternRecognizer(lookback=20)
     visualizer = ChartVisualizer()
@@ -134,14 +198,14 @@ def main():
             
         pattern_data = pattern_recognizer.analyze_patterns(df)
         
-        # Извлекаем числовое значение R:R для сравнения
+        # Извлекаем числовое значение R:R
         try:
             rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
             rr_value = float(rr_str)
         except:
             rr_value = 0.0
             
-        # ФИЛЬТР: Ищем только сделки с R:R >= 1.5 и подтвержденным объемом
+        # ФИЛЬТР: R:R >= 1.5 и подтвержденный объем
         if rr_value >= 1.5 and "Да ✅" in ta_data['volume_confirmed']:
             if rr_value > best_rr:
                 best_rr = rr_value
@@ -149,11 +213,17 @@ def main():
                     "symbol": coin,
                     "ta": ta_data,
                     "patterns": pattern_data,
-                    "df": df # Сохраняем для графика
+                    "df": df
                 }
                 
-    # 4. Если нашли хорошую сделку - генерируем и отправляем
+    # 4. Если нашли хорошую сделку - проверяем на дубликат и отправляем
     if best_signal:
+        direction = "ЛОНГ" if "Бычий" in best_signal['ta']['trend'] else "ШОРТ"
+        
+        if is_duplicate_signal(best_signal['symbol'], direction):
+            logging.info(f"️ Сигнал {best_signal['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            return
+        
         logging.info(f"✅ Найдена высоковероятная сделка: {best_signal['symbol']} (R:R {best_rr})")
         
         # Генерируем график
@@ -165,21 +235,20 @@ def main():
         )
         
         if chart_path:
-            post_text = generate_signal_post(
+            post_text = generate_detailed_signal(
                 best_signal['symbol'],
                 best_signal['ta'],
                 best_signal['patterns'],
+                regime,
                 macro_warning,
                 chart_path
             )
             send_to_telegram(post_text, chart_path)
         else:
             logging.warning("Не удалось создать график, отправляем только текст.")
-            # (Можно добавить отправку только текста, если график не создался)
             
     else:
         logging.info("ℹ️ Высоковероятных сделок (R:R ≥ 1.5 с подтверждением объема) не найдено. Сохраняем капитал.")
-        # Опционально: можно отправлять сообщение "Рынок во флэте, ждем настроек"
 
 if __name__ == "__main__":
     main()
