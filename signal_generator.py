@@ -3,7 +3,6 @@ import requests
 import json
 import logging
 from datetime import datetime, timezone, timedelta
-from multi_exchange_aggregator import ExchangeAggregator
 from global_market_health import MarketHealthChecker
 from macro_calendar import MacroCalendar
 from ta_engine import TAEngine
@@ -14,57 +13,12 @@ import numpy as np
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 15 самых ликвидных монет из всех портфелей PDF
+# 15 самых ликвидных монет
 SCAN_COINS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
     "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
     "NEARUSDT", "UNIUSDT", "AAVEUSDT", "FETUSDT", "ARBUSDT"
 ]
-
-# Файл для хранения последних сигналов (защита от дубликатов)
-LAST_SIGNALS_FILE = "last_signals.json"
-
-def load_last_signals():
-    """Загружает историю последних сигналов"""
-    try:
-        if os.path.exists(LAST_SIGNALS_FILE):
-            with open(LAST_SIGNALS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except Exception:
-        pass
-    return {"signals": []}
-
-def save_last_signals(data):
-    """Сохраняет историю сигналов"""
-    try:
-        with open(LAST_SIGNALS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        logging.error(f"Ошибка сохранения истории: {e}")
-
-def is_duplicate_signal(symbol, direction):
-    """Проверяет, не отправляли ли мы уже такой сигнал"""
-    history = load_last_signals()
-    now = datetime.now().isoformat()
-    
-    # Удаляем старые сигналы (старше 24 часов)
-    cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
-    history["signals"] = [s for s in history["signals"] if s["time"] > cutoff]
-    
-    # Проверяем дубликат
-    for signal in history["signals"]:
-        if signal["symbol"] == symbol and signal["direction"] == direction:
-            return True
-    
-    # Добавляем новый сигнал
-    history["signals"].append({
-        "symbol": symbol,
-        "direction": direction,
-        "time": now
-    })
-    
-    save_last_signals(history)
-    return False
 
 def get_historical_data(symbol: str, timeframe: str = "1h", limit: int = 100) -> pd.DataFrame:
     """Получает свечи через Binance API"""
@@ -89,40 +43,72 @@ def get_historical_data(symbol: str, timeframe: str = "1h", limit: int = 100) ->
         logging.error(f"Ошибка получения данных для {symbol}: {e}")
         return pd.DataFrame()
 
-def generate_detailed_signal(symbol: str, ta_data: dict, pattern_data: dict, macro_regime: str, macro_warning: str, chart_path: str) -> str:
-    """Формирует детальный торговый план с дисклеймером"""
-    direction = "🟢 ЛОНГ" if "Бычий" in ta_data['trend'] else "🔴 ШОРТ"
+def evaluate_signal_quality(ta_data: dict) -> tuple:
+    """Оценивает качество сигнала и возвращает (уровень, emoji, описание)"""
+    try:
+        rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
+        rr_value = float(rr_str)
+    except:
+        rr_value = 0.0
+    
+    volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
+    
+    if rr_value >= 1.5 and volume_confirmed:
+        return ("high", "", "Высоковероятный сигнал")
+    elif rr_value >= 1.2 and volume_confirmed:
+        return ("medium", "🟡", "Средняя вероятность")
+    elif rr_value >= 1.5 and not volume_confirmed:
+        return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
+    else:
+        return ("low", "", "Низкая вероятность — лучше воздержаться")
+
+def generate_analysis_post(symbol: str, ta_data: dict, pattern_data: dict, 
+                          macro_regime: str, macro_warning: str, quality_level: str,
+                          quality_emoji: str, quality_desc: str) -> str:
+    """Формирует детальный анализ с оценкой качества"""
+    direction = " ЛОНГ" if "Бычий" in ta_data['trend'] else "🔴 ШОРТ"
     coin_name = symbol.replace('USDT', '')
     
-    # Извлекаем R:R
     try:
         rr_value = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
     except:
         rr_value = "N/A"
     
-    post = f""" **ТОРГОВЫЙ ПЛАН: {coin_name}**
+    # Рекомендация в зависимости от качества
+    if quality_level == "high":
+        recommendation = "✅ Сигнал соответствует всем критериям. Можно рассматривать вход."
+    elif quality_level == "medium":
+        recommendation = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
+    else:
+        recommendation = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
+    
+    post = f"""{quality_emoji} **АНАЛИЗ РЫНКА: {coin_name}**
 
-📊 **МАКРО-КОНТЕКСТ:**
+📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
+
+📈 **МАКРО-КОНТЕКСТ:**
 • Глобальный режим: {macro_regime}
 {macro_warning if macro_warning else '• Макро-событий в ближайшие 24 часа не ожидается'}
 
-📈 **ТЕХНИЧЕСКАЯ КАРТИНА:**
+📉 **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
 • Тренд: {ta_data['trend']}
 • Импульс: {ta_data['momentum']}
 • MACD: {ta_data['macd']}
 • Объем (PVT): {ta_data['volume_confirmed']}
 • Паттерн: {', '.join(pattern_data['patterns'])}
 
-🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
-• Направление: {direction}
-• Точка входа: ~${ta_data['price']}
-• 🛑 Stop Loss: ${ta_data['support_level (SL)']}
-• 💰 Take Profit: ${ta_data['resistance_level (TP)']}
+🎯 **УРОВНИ:**
+• Текущая цена: ${ta_data['price']}
+• Поддержка (SL): ${ta_data['support_level (SL)']}
+• Сопротивление (TP): ${ta_data['resistance_level (TP)']}
 • Соотношение Риск/Прибыль: **1:{rr_value}**
 
 💡 **ОБОСНОВАНИЕ:**
-{'Рост подтвержден объемом и бычьим трендом. ' if 'Бычий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Падение подтверждено объемом и медвежьим трендом. ' if 'Медвежий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Движение не подтверждено объемом — повышенный риск. '}
-{f'Обнаружен паттерн {pattern_data["patterns"][0]}, что усиливает сигнал.' if pattern_data['patterns'] and 'не обнаружено' not in pattern_data['patterns'][0] else ''}
+{'Рост подтвержден объемом и бычьим трендом.' if 'Бычий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Падение подтверждено объемом и медвежьим трендом.' if 'Медвежий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Движение не подтверждено объемом — повышенный риск манипуляций.'}
+{f' Обнаружен паттерн {pattern_data["patterns"][0]}, что усиливает сигнал.' if pattern_data['patterns'] and 'не обнаружено' not in pattern_data['patterns'][0] else ''}
+
+📋 **РЕКОМЕНДАЦИЯ:**
+{recommendation}
 
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
@@ -135,7 +121,7 @@ def generate_detailed_signal(symbol: str, ta_data: dict, pattern_data: dict, mac
     return post
 
 def send_to_telegram(text: str, chart_path: str):
-    """Отправляет сигнал в Telegram (текст + график)"""
+    """Отправляет анализ в Telegram (текст + график)"""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
@@ -144,10 +130,9 @@ def send_to_telegram(text: str, chart_path: str):
         return
 
     try:
-        # Отправляем картинку с текстом в caption
         with open(chart_path, 'rb') as f:
             files = {
-                'photo': ('signal_chart.png', f, 'image/png'),
+                'photo': ('analysis_chart.png', f, 'image/png'),
                 'chat_id': (None, channel_id),
                 'caption': (None, text),
                 'parse_mode': (None, 'Markdown')
@@ -159,7 +144,7 @@ def send_to_telegram(text: str, chart_path: str):
             )
             
         if response.status_code == 200:
-            logging.info("✅ Сигнал успешно отправлен в Telegram!")
+            logging.info("✅ Анализ успешно отправлен в Telegram!")
         else:
             logging.error(f"❌ Ошибка Telegram: {response.text}")
             
@@ -167,9 +152,9 @@ def send_to_telegram(text: str, chart_path: str):
         logging.error(f"❌ Ошибка отправки: {e}")
 
 def main():
-    logging.info("🌙 Запуск Лунного Дозора: Генератор Сигналов v2.1 (15 монет)")
+    logging.info("🌙 Запуск Лунного Дозора: Анализ рынка v2.2 (обязательный пост)")
     
-    # 1. Макро-фильтр (Светофор)
+    # 1. Макро-фильтр
     health_checker = MarketHealthChecker()
     regime, cap_chg, vol_chg = health_checker.get_market_regime()
     logging.info(f"Глобальный режим рынка: {regime}")
@@ -183,8 +168,8 @@ def main():
     pattern_recognizer = PatternRecognizer(lookback=20)
     visualizer = ChartVisualizer()
     
-    best_signal = None
-    best_rr = 0.0
+    best_coin = None
+    best_score = -1  # Будем искать монету с лучшим R:R
     
     for coin in SCAN_COINS:
         logging.info(f"Анализ {coin}...")
@@ -198,57 +183,60 @@ def main():
             
         pattern_data = pattern_recognizer.analyze_patterns(df)
         
-        # Извлекаем числовое значение R:R
+        # Оцениваем качество
+        quality_level, _, _ = evaluate_signal_quality(ta_data)
+        
+        # Считаем "очки" для сравнения монет
         try:
             rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
             rr_value = float(rr_str)
         except:
             rr_value = 0.0
-            
-        # ФИЛЬТР: R:R >= 1.5 и подтвержденный объем
-        if rr_value >= 1.5 and "Да ✅" in ta_data['volume_confirmed']:
-            if rr_value > best_rr:
-                best_rr = rr_value
-                best_signal = {
-                    "symbol": coin,
-                    "ta": ta_data,
-                    "patterns": pattern_data,
-                    "df": df
-                }
-                
-    # 4. Если нашли хорошую сделку - проверяем на дубликат и отправляем
-    if best_signal:
-        direction = "ЛОНГ" if "Бычий" in best_signal['ta']['trend'] else "ШОРТ"
         
-        if is_duplicate_signal(best_signal['symbol'], direction):
-            logging.info(f"️ Сигнал {best_signal['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
-            return
+        score = rr_value
+        if "Да ✅" in ta_data['volume_confirmed']:
+            score += 0.5  # Бонус за подтверждение объемом
         
-        logging.info(f"✅ Найдена высоковероятная сделка: {best_signal['symbol']} (R:R {best_rr})")
+        if score > best_score:
+            best_score = score
+            best_coin = {
+                "symbol": coin,
+                "ta": ta_data,
+                "patterns": pattern_data,
+                "df": df,
+                "quality": quality_level
+            }
+    
+    # 4. ВСЕГДА отправляем анализ лучшей монеты
+    if best_coin:
+        logging.info(f"✅ Лучшая монета: {best_coin['symbol']} (score: {best_score})")
+        
+        quality_level, quality_emoji, quality_desc = evaluate_signal_quality(best_coin['ta'])
         
         # Генерируем график
         chart_path = visualizer.generate_signal_chart(
-            best_signal['df'], 
-            best_signal['symbol'], 
-            best_signal['ta'], 
-            filename=f"signal_{best_signal['symbol']}.png"
+            best_coin['df'], 
+            best_coin['symbol'], 
+            best_coin['ta'], 
+            filename=f"analysis_{best_coin['symbol']}.png"
         )
         
         if chart_path:
-            post_text = generate_detailed_signal(
-                best_signal['symbol'],
-                best_signal['ta'],
-                best_signal['patterns'],
+            post_text = generate_analysis_post(
+                best_coin['symbol'],
+                best_coin['ta'],
+                best_coin['patterns'],
                 regime,
                 macro_warning,
-                chart_path
+                quality_level,
+                quality_emoji,
+                quality_desc
             )
             send_to_telegram(post_text, chart_path)
         else:
-            logging.warning("Не удалось создать график, отправляем только текст.")
-            
+            logging.warning("Не удалось создать график.")
     else:
-        logging.info("ℹ️ Высоковероятных сделок (R:R ≥ 1.5 с подтверждением объема) не найдено. Сохраняем капитал.")
+        logging.error("❌ Не удалось проанализировать ни одну монету.")
 
 if __name__ == "__main__":
     main()
