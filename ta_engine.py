@@ -24,8 +24,8 @@ class TAEngine:
                 ema_indicator = ta.trend.EMAIndicator(close=df['close'], window=self.ema_length)
                 ema_50 = float(ema_indicator.ema_indicator().iloc[-1])
                 trend = "Бычий 🟢 (Цена > EMA50)" if current_price > ema_50 else "Медвежий 🔴 (Цена < EMA50)"
-            except Exception as e:
-                trend = f"Нейтрально  (EMA недоступен)"
+            except Exception:
+                trend = "Нейтрально ⚪ (EMA недоступен)"
 
             # 2. ИМПУЛЬС (RSI + StochRSI)
             try:
@@ -39,10 +39,10 @@ class TAEngine:
                 
                 momentum = "Нейтрально"
                 if rsi < 35 and stoch_k < 20:
-                    momentum = "Перепроданность (Потенциальный отскок вверх) "
+                    momentum = "Перепроданность (Потенциальный отскок вверх) 🟢"
                 elif rsi > 65 and stoch_k > 80:
                     momentum = "Перекупленность (Риск коррекции вниз) 🔴"
-            except Exception as e:
+            except Exception:
                 rsi, stoch_k = 50.0, 50.0
                 momentum = "Нейтрально ⚪ (RSI недоступен)"
 
@@ -54,21 +54,14 @@ class TAEngine:
                 )
                 macd_hist = float(macd_indicator.macd_diff().iloc[-1])
                 macd_signal_text = "Рост импульса 📈" if macd_hist > 0 else "Падение импульса 📉"
-            except Exception as e:
+            except Exception:
                 macd_signal_text = "Нейтрально ⚪ (MACD недоступен)"
 
-            # 4. PVT (Price Volume Trend) - Устойчивая версия для всех библиотек ta
+            # 4. PVT (Price Volume Trend) - ЧИСТЫЙ РАСЧЕТ ЧЕРЕЗ PANDAS (100% стабильность)
             try:
-                pvt_indicator = ta.volume.VolumePriceTrendIndicator(
-                    close=df['close'], volume=df['volume']
-                )
-                # Пробуем разные названия метода для совместимости версий библиотеки ta
-                if hasattr(pvt_indicator, 'volume_price_trend'):
-                    pvt_series = pvt_indicator.volume_price_trend()
-                elif hasattr(pvt_indicator, 'vpt'):
-                    pvt_series = pvt_indicator.vpt()
-                else:
-                    pvt_series = pvt_indicator.price_volume_trend()
+                # Формула PVT: (Текущая цена - Предыдущая цена) / Предыдущая цена * Объем
+                price_change = df['close'].pct_change()
+                pvt_series = (price_change * df['volume']).cumsum()
                 
                 pvt = float(pvt_series.iloc[-1])
                 pvt_prev = float(pvt_series.iloc[-2])
@@ -81,11 +74,11 @@ class TAEngine:
                 elif not price_up and not vol_up:
                     volume_confirmed = "Да ✅ (Падение на объемах)"
                 else:
-                    volume_confirmed = "Нет ️ (Дивергенция! Движение не подтверждено объемом)"
-            except Exception as e:
+                    volume_confirmed = "Нет ⚠️ (Дивергенция! Движение не подтверждено объемом)"
+            except Exception:
                 volume_confirmed = "Недоступно ⚠️ (PVT не рассчитан)"
 
-            # 5. FRACTALS (Упрощенные уровни для SL/TP)
+            # 5. FRACTALS (Уровни для SL/TP)
             recent_lows = float(df['low'].iloc[-10:].min())
             recent_highs = float(df['high'].iloc[-10:].max())
             
@@ -110,7 +103,3 @@ class TAEngine:
         except Exception as e:
             logging.error(f"Критическая ошибка в TA Engine: {e}")
             return {"error": str(e)}
-
-if __name__ == "__main__":
-    print("Тест TA Engine запущен...")
-    # (Тестовый блок можно оставить как был, он не мешает)
