@@ -1,0 +1,33 @@
+name: Advanced Trading Signals (Moon Watch v2.0)
+
+on:
+  schedule:
+    # Запускается каждые 4 часа (в 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 по UTC)
+    - cron: '0 */4 * * *'
+  workflow_dispatch:  # Ручной запуск для тестов
+
+jobs:
+  generate-signals:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11' # Используем 3.11 для 100% совместимости с ta и mplfinance
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv yfinance feedparser pandas matplotlib ta scipy mplfinance
+          
+      - name: Run Signal Generator
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
+        run: |
+          python signal_generator.py
