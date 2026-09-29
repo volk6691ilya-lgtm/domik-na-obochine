@@ -200,13 +200,57 @@ def send_to_telegram(text: str, chart_path: str):
     if not bot_token or not channel_id:
         logging.error("❌ Отсутствуют токены Telegram")
         return
+    
+    # 1. Сначала отправляем картинку с КОРОТКОЙ подписью (до 1024 символов)
     try:
         with open(chart_path, 'rb') as f:
-            files = {'photo': ('chart.png', f, 'image/png'), 'chat_id': (None, channel_id), 'caption': (None, text), 'parse_mode': (None, 'Markdown')}
-            response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendPhoto", files=files, timeout=30)
-        if response.status_code == 200: logging.info("✅ Отправлено в Telegram!")
-        else: logging.error(f"❌ Ошибка Telegram: {response.text}")
-    except Exception as e: logging.error(f" Ошибка отправки: {e}")
+            short_caption = f"📊 Анализ рынка\n\n🏆 Лучшая монета: {text.split('АНАЛИЗ РЫНКА: ')[1].split('**')[0] if 'АНАЛИЗ РЫНКА:' in text else 'Смотрите ниже'}\n\n👇 Полный разбор в следующем сообщении"
+            files = {
+                'photo': ('chart.png', f, 'image/png'),
+                'chat_id': (None, channel_id),
+                'caption': (None, short_caption[:1000]),
+                'parse_mode': (None, 'Markdown')
+            }
+            response = requests.post(
+                f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+                files=files,
+                timeout=30
+            )
+        if response.status_code == 200:
+            logging.info("✅ Картинка отправлена!")
+        else:
+            logging.error(f"❌ Ошибка отправки картинки: {response.text}")
+        time.sleep(2)
+    except Exception as e:
+        logging.error(f"❌ Ошибка отправки картинки: {e}")
+    
+    # 2. Затем отправляем полный текст отдельным сообщением
+    try:
+        # Разбиваем текст на части по 4000 символов (лимит Telegram)
+        parts = [text[i:i+4000] for i in range(0, len(text), 4000)]
+        
+        for i, part in enumerate(parts):
+            if i > 0:
+                time.sleep(2)
+            
+            text_payload = {
+                "chat_id": channel_id,
+                "text": part,
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": True
+            }
+            response = requests.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json=text_payload,
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                logging.info(f"✅ Текст (часть {i+1}/{len(parts)}) отправлен!")
+            else:
+                logging.error(f" Ошибка отправки текста: {response.text}")
+    except Exception as e:
+        logging.error(f"❌ Ошибка отправки текста: {e}")
 
 def main():
     logging.info("🌙 Запуск Лунного Дозора v2.7 (Yahoo Finance Fallback)")
