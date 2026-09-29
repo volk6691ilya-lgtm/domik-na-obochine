@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from datetime import datetime, timezone, timedelta
-import yfinance as yf  # <-- СЕКРЕТНОЕ ОРУЖИЕ (Yahoo Finance)
+import yfinance as yf
 import pandas as pd
 import numpy as np
 
@@ -16,7 +16,6 @@ from visualizer import ChartVisualizer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Браузерные заголовки для обхода блокировок
 BROWSER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -41,7 +40,7 @@ COINGECKO_IDS = {
 def get_historical_data_binance(symbol: str) -> pd.DataFrame:
     try:
         time.sleep(1)
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1h&limit=168"
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=4h&limit=42"
         response = requests.get(url, headers=BROWSER_HEADERS, timeout=10)
         if response.status_code == 200:
             data = response.json()
@@ -50,7 +49,7 @@ def get_historical_data_binance(symbol: str) -> pd.DataFrame:
                 df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
                 df.set_index('timestamp', inplace=True)
                 for col in ['open', 'high', 'low', 'close', 'volume']: df[col] = df[col].astype(float)
-                logging.info(f"✅ {symbol}: Получено через Binance")
+                logging.info(f"✅ {symbol}: Получено {len(df)} свечей (4H) через Binance")
                 return df
     except Exception as e:
         logging.warning(f"⚠️ {symbol}: Binance ошибка - {str(e)[:50]}")
@@ -59,7 +58,7 @@ def get_historical_data_binance(symbol: str) -> pd.DataFrame:
 def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
     try:
         time.sleep(1)
-        url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={symbol}&interval=60&limit=168"
+        url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={symbol}&interval=240&limit=42"
         response = requests.get(url, headers=BROWSER_HEADERS, timeout=10)
         if response.status_code == 200:
             data = response.json()
@@ -71,7 +70,7 @@ def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
                     df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
                     df.set_index('timestamp', inplace=True)
                     for col in ['open', 'high', 'low', 'close', 'volume']: df[col] = df[col].astype(float)
-                    logging.info(f"✅ {symbol}: Получено через Bybit")
+                    logging.info(f"✅ {symbol}: Получено {len(df)} свечей (4H) через Bybit")
                     return df
     except Exception as e:
         logging.warning(f"⚠️ {symbol}: Bybit ошибка - {str(e)[:50]}")
@@ -99,11 +98,10 @@ def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
     return pd.DataFrame()
 
 def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
-    """СЕКРЕТНОЕ ОРУЖИЕ: Yahoo Finance (никогда не блокирует GitHub)"""
     try:
-        logging.info(f"🔄 {symbol}: Биржи заблокированы, используем Yahoo Finance (yfinance)...")
+        logging.info(f"🔄 {symbol}: Биржи заблокированы, используем Yahoo Finance (4H)...")
         yf_symbol = symbol.replace('USDT', '-USD')
-        df = yf.download(yf_symbol, period="7d", interval="1h", progress=False)
+        df = yf.download(yf_symbol, period="3mo", interval="4h", progress=False)
         
         if not df.empty and len(df) > 20:
             df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
@@ -112,11 +110,12 @@ def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
             
             df = df.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'})
             df = df[['open', 'high', 'low', 'close', 'volume']]
+            df = df.tail(42)
             
-            logging.info(f"✅ {symbol}: Успешно получено {len(df)} свечей через Yahoo Finance!")
+            logging.info(f"✅ {symbol}: Успешно получено {len(df)} свечей (4H) через Yahoo Finance!")
             return df
     except Exception as e:
-        logging.error(f"❌ {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
+        logging.error(f" {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data(symbol: str) -> pd.DataFrame:
@@ -140,12 +139,9 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     try:
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
         rr_value = float(rr_str)
-        
-        # 🛡️ ЗАЩИТА ОТ АНОМАЛИЙ: Если R:R > 10, значит SL слишком близко к цене
         if rr_value > 10.0:
             rr_value = 1.0
             logging.warning(f"⚠️ Аномальный R:R ({rr_str}), нормализован до 1.0")
-            
     except:
         rr_value = 0.0
         
@@ -169,6 +165,21 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     elif quality_level == "medium": rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
     else: rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
+    pattern_text = ', '.join(pattern_data['patterns'])
+    has_bullish_pattern = any('Бычий' in p for p in pattern_data['patterns'])
+    
+    if 'Бычий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed']:
+        justification = "Рост подтвержден объемом и бычьим трендом."
+    elif 'Медвежий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed']:
+        if has_bullish_pattern:
+            justification = f"Несмотря на медвежий тренд, обнаружен бычий паттерн ({pattern_text}), что может сигнализировать о развороте."
+        else:
+            justification = "Падение подтверждено объемом и медвежьим трендом."
+    elif has_bullish_pattern:
+        justification = f"Обнаружен бычий паттерн ({pattern_text}), но движение не подтверждено объемом — повышенный риск."
+    else:
+        justification = "Движение не подтверждено объемом — повышенный риск манипуляций."
+    
     return f"""{quality_emoji} **АНАЛИЗ РЫНКА: {coin_name}**
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
@@ -177,12 +188,12 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Глобальный режим: {macro_regime}
 {macro_warning if macro_warning else '• Макро-событий в ближайшие 24 часа не ожидается'}
 
-📉 **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
+📉 **ТЕХНИЧЕСКАЯ КАРТИНА (4H таймфрейм):**
 • Тренд: {ta_data['trend']}
 • Импульс: {ta_data['momentum']}
 • MACD: {ta_data['macd']}
 • Объем (PVT): {ta_data['volume_confirmed']}
-• Паттерн: {', '.join(pattern_data['patterns'])}
+• Паттерн: {pattern_text}
 
 🎯 **УРОВНИ:**
 • Текущая цена: ${ta_data['price']}
@@ -191,7 +202,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Соотношение Риск/Прибыль: **1:{rr_value}**
 
 💡 **ОБОСНОВАНИЕ:**
-{'Рост подтвержден объемом и бычьим трендом.' if 'Бычий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Падение подтверждено объемом и медвежьим трендом.' if 'Медвежий' in ta_data['trend'] and 'Да ✅' in ta_data['volume_confirmed'] else 'Движение не подтверждено объемом — повышенный риск манипуляций.'}
+{justification}
 
 📋 **РЕКОМЕНДАЦИЯ:**
 {rec}
@@ -201,12 +212,11 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Обязательно используйте Stop Loss
 • Соотношение риск/прибыль должно быть ≥ 1:2 (текущее: 1:{rr_value})
 
-📜 **ДИСКЛЕЙМЕР:**
-⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль.
+ **ДИСКЛЕЙМЕР:**
+️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль.
 """
 
 def send_to_telegram(text: str, chart_path: str, symbol: str):
-    """Отправляет сигнал в Telegram: сначала картинка, потом полный текст"""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
@@ -214,12 +224,12 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
         logging.error("❌ Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
         return
 
-    # 1. Отправляем картинку с КОРОТКОЙ подписью (до 1024 символов)
+    # 1. Отправляем картинку с короткой подписью
     try:
         with open(chart_path, 'rb') as f:
             coin_name = symbol.replace('USDT', '')
             short_caption = f"📊 **АНАЛИЗ РЫНКА: {coin_name}**\n\n"
-            short_caption += f"📈 Технический анализ + уровни SL/TP\n\n"
+            short_caption += f" Технический анализ + уровни SL/TP\n\n"
             short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
             
             files = {
@@ -239,12 +249,12 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
         else:
             logging.error(f"❌ Ошибка отправки картинки: {response.text}")
             
-        time.sleep(2) # Небольшая пауза перед текстом
+        time.sleep(2)
         
     except Exception as e:
         logging.error(f"❌ Ошибка отправки картинки: {e}")
     
-    # 2. Отправляем полный текст анализа отдельным сообщением (разбиваем на части по 4000 символов)
+    # 2. Отправляем полный текст отдельным сообщением
     try:
         max_length = 4000
         parts = []
@@ -290,7 +300,7 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
         logging.error(f"❌ Ошибка отправки текста: {e}")
 
 def main():
-    logging.info("🌙 Запуск Лунного Дозора v2.7 (Yahoo Finance Fallback)")
+    logging.info(" Запуск Лунного Дозора v2.8 (4H таймфрейм)")
     
     health_checker = MarketHealthChecker()
     regime, _, _ = health_checker.get_market_regime()
@@ -307,7 +317,7 @@ def main():
     best_score = -1.0
     
     for coin in SCAN_COINS:
-        logging.info(f" Анализ {coin}...")
+        logging.info(f"🔍 Анализ {coin}...")
         df = get_historical_data(coin)
         if df.empty: continue
             
@@ -318,8 +328,13 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
-        try: rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
-        except: rr_value = 0.0
+        try: 
+            rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
+            if rr_value > 10.0:
+                rr_value = 1.0
+                logging.warning(f"️ {coin}: Аномальный R:R в signal_generator, нормализован")
+        except: 
+            rr_value = 0.0
         
         score = rr_value + (0.5 if "Да ✅" in ta_data['volume_confirmed'] else 0)
         logging.info(f"✅ {coin}: Score {score}")
