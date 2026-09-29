@@ -39,7 +39,7 @@ class TAEngine:
                 
                 momentum = "Нейтрально"
                 if rsi < 35 and stoch_k < 20:
-                    momentum = "Перепроданность (Потенциальный отскок вверх) 🟢"
+                    momentum = "Перепроданность (Потенциальный отскок вверх) "
                 elif rsi > 65 and stoch_k > 80:
                     momentum = "Перекупленность (Риск коррекции вниз) 🔴"
             except Exception:
@@ -57,9 +57,8 @@ class TAEngine:
             except Exception:
                 macd_signal_text = "Нейтрально ⚪ (MACD недоступен)"
 
-            # 4. PVT (Price Volume Trend) - ЧИСТЫЙ РАСЧЕТ ЧЕРЕЗ PANDAS (100% стабильность)
+            # 4. PVT (Price Volume Trend) - ЧИСТЫЙ РАСЧЕТ ЧЕРЕЗ PANDAS
             try:
-                # Формула PVT: (Текущая цена - Предыдущая цена) / Предыдущая цена * Объем
                 price_change = df['close'].pct_change()
                 pvt_series = (price_change * df['volume']).cumsum()
                 
@@ -76,15 +75,36 @@ class TAEngine:
                 else:
                     volume_confirmed = "Нет ⚠️ (Дивергенция! Движение не подтверждено объемом)"
             except Exception:
-                volume_confirmed = "Недоступно ⚠️ (PVT не рассчитан)"
+                volume_confirmed = "Недоступно ️ (PVT не рассчитан)"
 
-            # 5. FRACTALS (Уровни для SL/TP)
-            recent_lows = float(df['low'].iloc[-10:].min())
-            recent_highs = float(df['high'].iloc[-10:].max())
-            
+            # 5. FRACTALS (Умные уровни для SL/TP на 4H таймфрейме)
+            recent_lows_5 = float(df['low'].iloc[-5:].min())
+            distance_to_low_5 = (current_price - recent_lows_5) / current_price
+
+            if distance_to_low_5 < 0.01:
+                recent_lows = float(df['low'].iloc[-10:].min()) if len(df) >= 10 else recent_lows_5
+                logging.info(f"️ Цена слишком близко к минимуму (5 свечей), используем 10 свечей")
+            else:
+                recent_lows = recent_lows_5
+
+            recent_highs_5 = float(df['high'].iloc[-5:].max())
+            distance_to_high_5 = (recent_highs_5 - current_price) / current_price
+
+            if distance_to_high_5 < 0.01:
+                recent_highs = float(df['high'].iloc[-10:].max()) if len(df) >= 10 else recent_highs_5
+                logging.info(f"⚠️ Цена слишком близко к максимуму (5 свечей), используем 10 свечей")
+            else:
+                recent_highs = recent_highs_5
+
             risk = current_price - recent_lows
             reward = recent_highs - current_price
+
             rr_ratio = round(reward / risk, 2) if risk > 0 else 0.0
+
+            if rr_ratio > 10.0:
+                rr_ratio = 1.0
+                logging.warning(f"⚠️ Аномальный R:R ({rr_ratio}), нормализован до 1.0")
+
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
             return {
