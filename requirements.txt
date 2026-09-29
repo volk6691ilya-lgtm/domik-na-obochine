@@ -4,3 +4,6 @@ yfinance
 feedparser
 pandas
 matplotlib
+ta
+scipy
+mplfinance
