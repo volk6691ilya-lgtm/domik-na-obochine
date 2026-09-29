@@ -1,9 +1,10 @@
-name: Advanced Trading Signals (Moon Watch v2.0)
+name: Advanced Trading Signals (Moon Watch v2.1)
 
 on:
   schedule:
-    # Запускается каждые 4 часа (в 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 по UTC)
-    - cron: '0 */4 * * *'
+    # Запускается 4 раза в сутки: 01:00, 05:00, 13:00, 17:00 МСК
+    # В UTC это: 22:00, 02:00, 10:00, 14:00
+    - cron: '0 22,2,10,14 * * *'
   workflow_dispatch:  # Ручной запуск для тестов
 
 jobs:
@@ -17,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11' # Используем 3.11 для 100% совместимости с ta и mplfinance
+          python-version: '3.11'
           
       - name: Install dependencies
         run: |
