@@ -141,9 +141,10 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
         rr_value = float(rr_str)
         
-        # 🛡️ ЗАЩИТА ОТ АНОМАЛИЙ: Если R:R > 10, значит цена слишком близка к минимуму (ошибка расчета)
+        # 🛡️ ЗАЩИТА ОТ АНОМАЛИЙ: Если R:R > 10, значит SL слишком близко к цене
         if rr_value > 10.0:
-            rr_value = 1.0 
+            rr_value = 1.0
+            logging.warning(f"⚠️ Аномальный R:R ({rr_str}), нормализован до 1.0")
             
     except:
         rr_value = 0.0
