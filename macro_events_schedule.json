@@ -1,0 +1,58 @@
+{
+  "2026": {
+    "FOMC": [
+      {"date": "2026-10-28", "time": "20:00", "description": "FOMC Rate Decision (летнее время EDT)", "timezone": "EDT"},
+      {"date": "2026-12-09", "time": "21:00", "description": "FOMC Rate Decision (зимнее время EST)", "timezone": "EST"}
+    ],
+    "CPI": [
+      {"date": "2026-10-14", "time": "14:30", "description": "CPI m/m (Инфляция)", "timezone": "EDT"},
+      {"date": "2026-11-10", "time": "15:30", "description": "CPI m/m", "timezone": "EST"},
+      {"date": "2026-12-10", "time": "15:30", "description": "CPI m/m", "timezone": "EST"}
+    ],
+    "NFP": [
+      {"date": "2026-10-02", "time": "14:30", "description": "Non-Farm Payrolls (Безработица)", "timezone": "EDT"},
+      {"date": "2026-11-06", "time": "15:30", "description": "Non-Farm Payrolls", "timezone": "EST"},
+      {"date": "2026-12-04", "time": "15:30", "description": "Non-Farm Payrolls", "timezone": "EST"}
+    ]
+  },
+  "2027": {
+    "FOMC": [
+      {"date": "2027-01-27", "time": "21:00", "description": "FOMC Rate Decision", "timezone": "EST"},
+      {"date": "2027-03-17", "time": "20:00", "description": "FOMC Rate Decision + Press Conference", "timezone": "EDT"},
+      {"date": "2027-04-28", "time": "20:00", "description": "FOMC Rate Decision", "timezone": "EDT"},
+      {"date": "2027-06-09", "time": "20:00", "description": "FOMC Rate Decision + Press Conference", "timezone": "EDT"},
+      {"date": "2027-07-28", "time": "20:00", "description": "FOMC Rate Decision", "timezone": "EDT"},
+      {"date": "2027-09-15", "time": "20:00", "description": "FOMC Rate Decision + Press Conference", "timezone": "EDT"},
+      {"date": "2027-10-27", "time": "20:00", "description": "FOMC Rate Decision", "timezone": "EDT"},
+      {"date": "2027-12-08", "time": "21:00", "description": "FOMC Rate Decision + Press Conference", "timezone": "EST"}
+    ],
+    "CPI": [
+      {"date": "2027-01-13", "time": "15:30", "description": "CPI m/m", "timezone": "EST"},
+      {"date": "2027-02-10", "time": "15:30", "description": "CPI m/m", "timezone": "EST"},
+      {"date": "2027-03-10", "time": "15:30", "description": "CPI m/m", "timezone": "EST"},
+      {"date": "2027-04-13", "time": "14:30", "description": "CPI m/m", "timezone": "EDT"},
+      {"date": "2027-05-12", "time": "14:30", "description": "CPI m/m", "timezone": "EDT"},
+      {"date": "2027-06-10", "time": "14:30", "description": "CPI m/m", "timezone": "EDT"},
+      {"date": "2027-07-13", "time": "14:30", "description": "CPI m/m", "timezone": "EDT"},
+      {"date": "2027-08-11", "time": "14:30", "description": "CPI m/m", "timezone": "EDT"},
+      {"date": "2027-09-15", "time": "14:30", "description": "CPI m/m", "timezone": "EDT"},
+      {"date": "2027-10-13", "time": "14:30", "description": "CPI m/m", "timezone": "EDT"},
+      {"date": "2027-11-10", "time": "15:30", "description": "CPI m/m", "timezone": "EST"},
+      {"date": "2027-12-10", "time": "15:30", "description": "CPI m/m", "timezone": "EST"}
+    ],
+    "NFP": [
+      {"date": "2027-01-08", "time": "15:30", "description": "Non-Farm Payrolls", "timezone": "EST"},
+      {"date": "2027-02-05", "time": "15:30", "description": "Non-Farm Payrolls", "timezone": "EST"},
+      {"date": "2027-03-05", "time": "15:30", "description": "Non-Farm Payrolls", "timezone": "EST"},
+      {"date": "2027-04-02", "time": "14:30", "description": "Non-Farm Payrolls", "timezone": "EDT"},
+      {"date": "2027-05-07", "time": "14:30", "description": "Non-Farm Payrolls", "timezone": "EDT"},
+      {"date": "2027-06-04", "time": "14:30", "description": "Non-Farm Payrolls", "timezone": "EDT"},
+      {"date": "2027-07-02", "time": "14:30", "description": "Non-Farm Payrolls", "timezone": "EDT"},
+      {"date": "2027-08-06", "time": "14:30", "description": "Non-Farm Payrolls", "timezone": "EDT"},
+      {"date": "2027-09-03", "time": "14:30", "description": "Non-Farm Payrolls", "timezone": "EDT"},
+      {"date": "2027-10-01", "time": "14:30", "description": "Non-Farm Payrolls", "timezone": "EDT"},
+      {"date": "2027-11-05", "time": "15:30", "description": "Non-Farm Payrolls", "timezone": "EST"},
+      {"date": "2027-12-03", "time": "15:30", "description": "Non-Farm Payrolls", "timezone": "EST"}
+    ]
+  }
+}
