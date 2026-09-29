@@ -140,14 +140,24 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     try:
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
         rr_value = float(rr_str)
+        
+        # 🛡️ ЗАЩИТА ОТ АНОМАЛИЙ: Если R:R > 10, значит цена слишком близка к минимуму (ошибка расчета)
+        if rr_value > 10.0:
+            rr_value = 1.0 
+            
     except:
         rr_value = 0.0
+        
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
-    if rr_value >= 1.5 and volume_confirmed: return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 1.2 and volume_confirmed: return ("medium", "🟡", "Средняя вероятность")
-    elif rr_value >= 1.5 and not volume_confirmed: return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
-    else: return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
+    if rr_value >= 1.5 and volume_confirmed: 
+        return ("high", "🟢", "Высоковероятный сигнал")
+    elif rr_value >= 1.2 and volume_confirmed: 
+        return ("medium", "🟡", "Средняя вероятность")
+    elif rr_value >= 1.5 and not volume_confirmed: 
+        return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
+    else: 
+        return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
     coin_name = symbol.replace('USDT', '')
@@ -194,21 +204,27 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 ⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль.
 """
 
-def send_to_telegram(text: str, chart_path: str):
+def send_to_telegram(text: str, chart_path: str, symbol: str):
+    """Отправляет сигнал в Telegram: сначала картинка, потом полный текст"""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
-    if not bot_token or not channel_id:
-        logging.error("❌ Отсутствуют токены Telegram")
-        return
     
-    # 1. Сначала отправляем картинку с КОРОТКОЙ подписью (до 1024 символов)
+    if not bot_token or not channel_id:
+        logging.error("❌ Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
+        return
+
+    # 1. Отправляем картинку с КОРОТКОЙ подписью (до 1024 символов)
     try:
         with open(chart_path, 'rb') as f:
-            short_caption = f"📊 Анализ рынка\n\n🏆 Лучшая монета: {text.split('АНАЛИЗ РЫНКА: ')[1].split('**')[0] if 'АНАЛИЗ РЫНКА:' in text else 'Смотрите ниже'}\n\n👇 Полный разбор в следующем сообщении"
+            coin_name = symbol.replace('USDT', '')
+            short_caption = f"📊 **АНАЛИЗ РЫНКА: {coin_name}**\n\n"
+            short_caption += f"📈 Технический анализ + уровни SL/TP\n\n"
+            short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
+            
             files = {
-                'photo': ('chart.png', f, 'image/png'),
+                'photo': ('analysis_chart.png', f, 'image/png'),
                 'chat_id': (None, channel_id),
-                'caption': (None, short_caption[:1000]),
+                'caption': (None, short_caption),
                 'parse_mode': (None, 'Markdown')
             }
             response = requests.post(
@@ -216,18 +232,36 @@ def send_to_telegram(text: str, chart_path: str):
                 files=files,
                 timeout=30
             )
+            
         if response.status_code == 200:
-            logging.info("✅ Картинка отправлена!")
+            logging.info("✅ Картинка успешно отправлена в Telegram!")
         else:
             logging.error(f"❌ Ошибка отправки картинки: {response.text}")
-        time.sleep(2)
+            
+        time.sleep(2) # Небольшая пауза перед текстом
+        
     except Exception as e:
         logging.error(f"❌ Ошибка отправки картинки: {e}")
     
-    # 2. Затем отправляем полный текст отдельным сообщением
+    # 2. Отправляем полный текст анализа отдельным сообщением (разбиваем на части по 4000 символов)
     try:
-        # Разбиваем текст на части по 4000 символов (лимит Telegram)
-        parts = [text[i:i+4000] for i in range(0, len(text), 4000)]
+        max_length = 4000
+        parts = []
+        
+        if len(text) <= max_length:
+            parts.append(text)
+        else:
+            paragraphs = text.split('\n\n')
+            current_part = ""
+            for para in paragraphs:
+                if len(current_part) + len(para) + 2 <= max_length:
+                    current_part += para + "\n\n"
+                else:
+                    if current_part:
+                        parts.append(current_part.strip())
+                    current_part = para + "\n\n"
+            if current_part:
+                parts.append(current_part.strip())
         
         for i, part in enumerate(parts):
             if i > 0:
@@ -239,6 +273,7 @@ def send_to_telegram(text: str, chart_path: str):
                 "parse_mode": "Markdown",
                 "disable_web_page_preview": True
             }
+            
             response = requests.post(
                 f"https://api.telegram.org/bot{bot_token}/sendMessage",
                 json=text_payload,
@@ -248,7 +283,8 @@ def send_to_telegram(text: str, chart_path: str):
             if response.status_code == 200:
                 logging.info(f"✅ Текст (часть {i+1}/{len(parts)}) отправлен!")
             else:
-                logging.error(f" Ошибка отправки текста: {response.text}")
+                logging.error(f"❌ Ошибка отправки текста: {response.text}")
+                
     except Exception as e:
         logging.error(f"❌ Ошибка отправки текста: {e}")
 
