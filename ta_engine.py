@@ -26,6 +26,7 @@ class TAEngine:
                 trend = "Бычий 🟢 (Цена > EMA50)" if current_price > ema_50 else "Медвежий 🔴 (Цена < EMA50)"
             except Exception:
                 trend = "Нейтрально ⚪ (EMA недоступен)"
+                ema_50 = current_price
 
             # 2. ИМПУЛЬС (RSI + StochRSI)
             try:
@@ -39,9 +40,9 @@ class TAEngine:
                 
                 momentum = "Нейтрально"
                 if rsi < 35 and stoch_k < 20:
-                    momentum = "Перепроданность (Потенциальный отскок вверх) "
+                    momentum = "Перепроданность (Потенциальный отскок вверх) 🟢"
                 elif rsi > 65 and stoch_k > 80:
-                    momentum = "Перекупленность (Риск коррекции вниз) 🔴"
+                    momentum = "Перекупленность (Риск коррекции вниз) "
             except Exception:
                 rsi, stoch_k = 50.0, 50.0
                 momentum = "Нейтрально ⚪ (RSI недоступен)"
@@ -73,51 +74,76 @@ class TAEngine:
                 elif not price_up and not vol_up:
                     volume_confirmed = "Да ✅ (Падение на объемах)"
                 else:
-                    volume_confirmed = "Нет ⚠️ (Дивергенция! Движение не подтверждено объемом)"
+                    volume_confirmed = "Нет ️ (Дивергенция! Движение не подтверждено объемом)"
             except Exception:
-                volume_confirmed = "Недоступно ️ (PVT не рассчитан)"
+                volume_confirmed = "Недоступно ⚠️ (PVT не рассчитан)"
 
-            # 5. FRACTALS (Умные уровни для SL/TP на 4H таймфрейме)
-            recent_lows_5 = float(df['low'].iloc[-5:].min())
-            distance_to_low_5 = (current_price - recent_lows_5) / current_price
+            # 5. ATR (Average True Range) для расчета Stop Loss
+            try:
+                atr_indicator = ta.volatility.AverageTrueRange(
+                    high=df['high'], low=df['low'], close=df['close'], window=14
+                )
+                atr = float(atr_indicator.average_true_range().iloc[-1])
+            except Exception:
+                atr = (float(df['high'].iloc[-1]) - float(df['low'].iloc[-1])) * 1.5
 
-            if distance_to_low_5 < 0.01:
-                recent_lows = float(df['low'].iloc[-10:].min()) if len(df) >= 10 else recent_lows_5
-                logging.info(f"️ Цена слишком близко к минимуму (5 свечей), используем 10 свечей")
+            # 6. УРОВНИ SL/TP С БУФЕРОМ (для краткосрочной торговли 2-4 часа)
+            # Берем последние 20 свечей (4-5 дней на 4H таймфрейме)
+            recent_lows = float(df['low'].iloc[-20:].min())
+            recent_highs = float(df['high'].iloc[-20:].max())
+            
+            # Определяем направление
+            is_long = "Бычий" in trend
+            
+            if is_long:
+                # Для лонга: SL ниже поддержки с буфером, TP выше сопротивления
+                sl_level = recent_lows - (atr * 0.5)  # Буфер 0.5 ATR
+                tp_level = recent_highs + (atr * 0.3)  # Буфер 0.3 ATR
+                
+                # Точка входа: откат к EMA50 или к середине диапазона
+                entry_level = min(current_price, (recent_lows + recent_highs) / 2)
+                
+                # Если цена уже выше EMA50, вход на откате к EMA
+                if current_price > ema_50:
+                    entry_level = max(ema_50, recent_lows + (recent_highs - recent_lows) * 0.3)
             else:
-                recent_lows = recent_lows_5
+                # Для шорта: SL выше сопротивления с буфером, TP ниже поддержки
+                sl_level = recent_highs + (atr * 0.5)
+                tp_level = recent_lows - (atr * 0.3)
+                
+                # Точка входа: откат к EMA50 или к середине диапазона
+                entry_level = max(current_price, (recent_lows + recent_highs) / 2)
+                
+                # Если цена ниже EMA50, вход на откате к EMA
+                if current_price < ema_50:
+                    entry_level = min(ema_50, recent_highs - (recent_highs - recent_lows) * 0.3)
 
-            recent_highs_5 = float(df['high'].iloc[-5:].max())
-            distance_to_high_5 = (recent_highs_5 - current_price) / current_price
-
-            if distance_to_high_5 < 0.01:
-                recent_highs = float(df['high'].iloc[-10:].max()) if len(df) >= 10 else recent_highs_5
-                logging.info(f"⚠️ Цена слишком близко к максимуму (5 свечей), используем 10 свечей")
-            else:
-                recent_highs = recent_highs_5
-
-            risk = current_price - recent_lows
-            reward = recent_highs - current_price
-
+            # Рассчитываем риск и прибыль
+            risk = abs(current_price - sl_level)
+            reward = abs(tp_level - current_price)
+            
             rr_ratio = round(reward / risk, 2) if risk > 0 else 0.0
 
+            # 🛡️ ЖЕСТКАЯ ЗАЩИТА: если R:R > 10, нормализуем
             if rr_ratio > 10.0:
                 rr_ratio = 1.0
-                logging.warning(f"⚠️ Аномальный R:R ({rr_ratio}), нормализован до 1.0")
+                logging.warning(f"️ Аномальный R:R ({rr_ratio}), нормализован до 1.0")
 
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
             return {
                 "price": round(current_price, 4),
+                "entry": round(entry_level, 4),
+                "sl": round(sl_level, 4),
+                "tp": round(tp_level, 4),
                 "trend": trend,
                 "momentum": momentum,
                 "macd": macd_signal_text,
                 "volume_confirmed": volume_confirmed,
-                "support_level (SL)": round(recent_lows, 4),
-                "resistance_level (TP)": round(recent_highs, 4),
                 "estimated_R:R": f"1 : {rr_ratio} ({rr_status})",
                 "rsi": round(rsi, 2),
-                "stoch_k": round(stoch_k, 2)
+                "stoch_k": round(stoch_k, 2),
+                "atr": round(atr, 4)
             }
 
         except Exception as e:
