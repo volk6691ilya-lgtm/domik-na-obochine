@@ -26,30 +26,43 @@ class ChartVisualizer:
             if not isinstance(df.index, pd.DatetimeIndex):
                 df.index = pd.to_datetime(df.index)
 
-            support_level = ta_data.get("support_level (SL)")
-            resistance_level = ta_data.get("resistance_level (TP)")
+            # Поддержка и новых ключей (sl, tp, entry), и старых для совместимости
+            sl_level = ta_data.get("sl") or ta_data.get("support_level (SL)")
+            tp_level = ta_data.get("tp") or ta_data.get("resistance_level (TP)")
+            entry_level = ta_data.get("entry", ta_data.get("price", "N/A"))
 
             hlines = []
             hlines_colors = []
 
-            # Добавляем уровень поддержки (зеленый)
-            if support_level:
-                hlines.append(support_level)
+            # 1. Стоп-лосс (Зеленый 🟢)
+            if sl_level:
+                hlines.append(float(sl_level))
                 hlines_colors.append('green')
 
-            # Добавляем уровень сопротивления (красный)
-            if resistance_level:
-                hlines.append(resistance_level)
-                hlines_colors.append('red')
+            # 2. Точка входа (Синий 🔵)
+            if entry_level and entry_level != "N/A":
+                entry_float = float(entry_level)
+                # Проверка, чтобы не рисовать две линии друг на друге, если цены совпали
+                if entry_float not in hlines:
+                    hlines.append(entry_float)
+                    hlines_colors.append('blue')
+
+            # 3. Тейк-профит (Красный 🔴)
+            if tp_level:
+                tp_float = float(tp_level)
+                if tp_float not in hlines:
+                    hlines.append(tp_float)
+                    hlines_colors.append('red')
 
             # Настройки стиля графика (похож на TradingView)
             mc = mpf.make_marketcolors(up='g', down='r', edge='i', wick='i', volume='in', inherit=True)
             s = mpf.make_mpf_style(marketcolors=mc, base_mpf_style='charles')
 
-            title = f"{symbol} | Цена: ${ta_data.get('price', 'N/A')} | R:R {ta_data.get('estimated_R:R', 'N/A')}"
+            # Обновленный заголовок с тремя уровнями
+            title = f"{symbol} | Entry: ${entry_level} | SL: ${sl_level} | TP: ${tp_level}"
             filepath = os.path.join(self.output_dir, filename)
 
-            # ГЕНЕРАЦИЯ ГРАФИКА (Упрощенный и 100% рабочий вариант hlines)
+            # ГЕНЕРАЦИЯ ГРАФИКА
             mpf.plot(
                 df,
                 type='candle',
@@ -58,7 +71,7 @@ class ChartVisualizer:
                 ylabel='Price (USDT)',
                 volume=True,
                 ylabel_lower='Volume',
-                hlines=dict(hlines=hlines, colors=hlines_colors), # <-- Только линии и цвета
+                hlines=dict(hlines=hlines, colors=hlines_colors),
                 savefig=filepath,
                 figratio=(10, 6),
                 figscale=1.2
@@ -73,7 +86,7 @@ class ChartVisualizer:
 
 # Блок для локального тестирования
 if __name__ == "__main__":
-    print("\n--- Тест Chart Visualizer (Генерация графика) ---")
+    print("\n--- Тест Chart Visualizer (Генерация графика с Entry, SL, TP) ---")
     
     np.random.seed(42)
     dates = pd.date_range(end='2026-09-28', periods=50, freq='1h')
@@ -87,11 +100,13 @@ if __name__ == "__main__":
         'open': opens, 'high': highs, 'low': lows, 'close': closes, 'volume': volumes
     }, index=dates)
 
+    # Обновленные тестовые данные с тремя уровнями
     mock_ta_data = {
         "price": 98.50,
-        "estimated_R:R": "1 : 2.5",
-        "support_level (SL)": 95.00,  
-        "resistance_level (TP)": 105.00 
+        "entry": 98.00,      # 🔵 Синяя линия
+        "sl": 95.00,         # 🟢 Зеленая линия
+        "tp": 105.00,        # 🔴 Красная линия
+        "estimated_R:R": "1 : 2.5"
     }
 
     visualizer = ChartVisualizer()
@@ -99,7 +114,7 @@ if __name__ == "__main__":
     
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
-        print("👉 Открой эту картинку, чтобы увидеть свечи, объемы и цветные линии SL/TP!")
+        print("👉 Открой эту картинку, чтобы увидеть свечи, объемы и 3 цветные линии (Entry, SL, TP)!")
     else:
         print("\n❌ Ошибка при создании графика.")
         
