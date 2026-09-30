@@ -37,6 +37,51 @@ COINGECKO_IDS = {
     "AAVEUSDT": "aave", "FETUSDT": "fetch-ai", "ARBUSDT": "arbitrum"
 }
 
+# Файл для хранения последних сигналов (защита от дубликатов)
+LAST_SIGNALS_FILE = "last_signals.json"
+
+def load_last_signals():
+    """Загружает историю последних сигналов"""
+    try:
+        if os.path.exists(LAST_SIGNALS_FILE):
+            with open(LAST_SIGNALS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {"signals": []}
+
+def save_last_signals(data):
+    """Сохраняет историю сигналов"""
+    try:
+        with open(LAST_SIGNALS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Ошибка сохранения истории: {e}")
+
+def is_duplicate_signal(symbol, direction):
+    """Проверяет, не отправляли ли мы уже такой сигнал"""
+    history = load_last_signals()
+    now = datetime.now().isoformat()
+    
+    # Удаляем старые сигналы (старше 24 часов)
+    cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
+    history["signals"] = [s for s in history["signals"] if s["time"] > cutoff]
+    
+    # Проверяем дубликат
+    for signal in history["signals"]:
+        if signal["symbol"] == symbol and signal["direction"] == direction:
+            return True
+    
+    # Добавляем новый сигнал
+    history["signals"].append({
+        "symbol": symbol,
+        "direction": direction,
+        "time": now
+    })
+    
+    save_last_signals(history)
+    return False
+
 def get_historical_data_binance(symbol: str) -> pd.DataFrame:
     try:
         time.sleep(1)
@@ -115,7 +160,7 @@ def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
             logging.info(f"✅ {symbol}: Успешно получено {len(df)} свечей (4H) через Yahoo Finance!")
             return df
     except Exception as e:
-        logging.error(f" {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
+        logging.error(f"❌ {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data(symbol: str) -> pd.DataFrame:
@@ -152,19 +197,42 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     elif rr_value >= 1.2 and volume_confirmed: 
         return ("medium", "🟡", "Средняя вероятность")
     elif rr_value >= 1.5 and not volume_confirmed: 
-        return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
+        return ("medium", "", "Хороший R:R, но объем не подтвержден")
     else: 
         return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
+    """Генерирует пост с точкой входа, SL, TP1/TP2/TP3 и плечом"""
     coin_name = symbol.replace('USDT', '')
-    try: rr_value = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
-    except: rr_value = "N/A"
     
-    if quality_level == "high": rec = "✅ Сигнал соответствует всем критериям. Можно рассматривать вход."
-    elif quality_level == "medium": rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
-    else: rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
+    try: 
+        rr_value = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
+    except: 
+        rr_value = "N/A"
     
+    # Определяем направление
+    is_long = "Бычий" in ta_data['trend']
+    direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
+    direction_emoji = "🟢" if is_long else "🔴"
+    
+    # Рассчитываем TP1, TP2, TP3
+    entry = ta_data['entry']
+    sl = ta_data['sl']
+    tp = ta_data['tp']
+    
+    if is_long:
+        tp1 = round(entry + (tp - entry) * 0.4, 4)  # 40% движения
+        tp2 = round(entry + (tp - entry) * 0.7, 4)  # 70% движения
+        tp3 = tp  # 100% движения
+    else:
+        tp1 = round(entry - (entry - tp) * 0.4, 4)
+        tp2 = round(entry - (entry - tp) * 0.7, 4)
+        tp3 = tp
+    
+    # Рекомендуемое плечо (безопасное для новичков)
+    leverage = "3x-5x" if quality_level == "high" else "2x-3x"
+    
+    # Обоснование с учетом паттерна
     pattern_text = ', '.join(pattern_data['patterns'])
     has_bullish_pattern = any('Бычий' in p for p in pattern_data['patterns'])
     
@@ -180,9 +248,29 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         justification = "Движение не подтверждено объемом — повышенный риск манипуляций."
     
-    return f"""{quality_emoji} **АНАЛИЗ РЫНКА: {coin_name}**
+    # Рекомендация
+    if quality_level == "high": 
+        rec = "✅ Сигнал соответствует всем критериям. Можно рассматривать вход."
+    elif quality_level == "medium": 
+        rec = "️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
+    else: 
+        rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
+    
+    # Формируем пост (упрощенный для новичков)
+    post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
+
+🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
+• Направление: {direction_emoji} **{direction}**
+• **Точка входа:** ${entry}
+• **Стоп-лосс (SL):** ${sl} *(если цена упадет ниже — выходим)*
+• **Цели прибыли (TP):**
+  - TP1: ${tp1} *(фиксация 40% прибыли)*
+  - TP2: ${tp2} *(фиксация 70% прибыли)*
+  - TP3: ${tp3} *(полная цель)*
+• **Плечо:** {leverage} *(безопасно для новичков)*
+• Соотношение Риск/Прибыль: **1:{rr_value}**
 
 📈 **МАКРО-КОНТЕКСТ:**
 • Глобальный режим: {macro_regime}
@@ -195,28 +283,26 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Объем (PVT): {ta_data['volume_confirmed']}
 • Паттерн: {pattern_text}
 
-🎯 **УРОВНИ:**
-• Текущая цена: ${ta_data['price']}
-• Поддержка (SL): ${ta_data['support_level (SL)']}
-• Сопротивление (TP): ${ta_data['resistance_level (TP)']}
-• Соотношение Риск/Прибыль: **1:{rr_value}**
-
 💡 **ОБОСНОВАНИЕ:**
 {justification}
 
 📋 **РЕКОМЕНДАЦИЯ:**
 {rec}
 
+️ **СРОК АКТУАЛЬНОСТИ:** 2-4 часа (до следующего анализа)
+
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
 • Обязательно используйте Stop Loss
 • Соотношение риск/прибыль должно быть ≥ 1:2 (текущее: 1:{rr_value})
 
- **ДИСКЛЕЙМЕР:**
-️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль.
+📜 **ДИСКЛЕЙМЕР:**
+⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR — Do Your Own Research, проводите собственное исследование). Прошлые результаты не гарантируют будущую прибыль.
 """
+    return post
 
 def send_to_telegram(text: str, chart_path: str, symbol: str):
+    """Отправляет сигнал в Telegram: сначала картинка, потом полный текст"""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
@@ -228,12 +314,12 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
     try:
         with open(chart_path, 'rb') as f:
             coin_name = symbol.replace('USDT', '')
-            short_caption = f"📊 **АНАЛИЗ РЫНКА: {coin_name}**\n\n"
-            short_caption += f" Технический анализ + уровни SL/TP\n\n"
+            short_caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n"
+            short_caption += f"🎯 Точка входа + SL/TP\n\n"
             short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
             
             files = {
-                'photo': ('analysis_chart.png', f, 'image/png'),
+                'photo': ('signal_chart.png', f, 'image/png'),
                 'chat_id': (None, channel_id),
                 'caption': (None, short_caption),
                 'parse_mode': (None, 'Markdown')
@@ -297,10 +383,10 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
                 logging.error(f"❌ Ошибка отправки текста: {response.text}")
                 
     except Exception as e:
-        logging.error(f"❌ Ошибка отправки текста: {e}")
+        logging.error(f" Ошибка отправки текста: {e}")
 
 def main():
-    logging.info(" Запуск Лунного Дозора v2.8 (4H таймфрейм)")
+    logging.info("🌙 Запуск Лунного Дозора v3.0 (краткосрочные сигналы + защита от дубликатов)")
     
     health_checker = MarketHealthChecker()
     regime, _, _ = health_checker.get_market_regime()
@@ -332,7 +418,7 @@ def main():
             rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
             if rr_value > 10.0:
                 rr_value = 1.0
-                logging.warning(f"️ {coin}: Аномальный R:R в signal_generator, нормализован")
+                logging.warning(f"⚠️ {coin}: Аномальный R:R в signal_generator, нормализован")
         except: 
             rr_value = 0.0
         
@@ -344,8 +430,16 @@ def main():
             best_coin = {"symbol": coin, "ta": ta_data, "patterns": pattern_data, "df": df, "ql": quality_level, "qe": quality_emoji, "qd": quality_desc}
     
     if best_coin:
+        # Проверяем на дубликат
+        is_long = "Бычий" in best_coin['ta']['trend']
+        direction = "ЛОНГ" if is_long else "ШОРТ"
+        
+        if is_duplicate_signal(best_coin['symbol'], direction):
+            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            return
+        
         logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
-        chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"analysis_{best_coin['symbol']}.png")
+        chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"signal_{best_coin['symbol']}.png")
         if chart_path:
             post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
             send_to_telegram(post_text, chart_path, best_coin['symbol'])
