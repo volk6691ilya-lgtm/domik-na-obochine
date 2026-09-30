@@ -184,6 +184,8 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     try:
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
         rr_value = float(rr_str)
+        
+        # 🛡️ Защита от аномалий остается (как и было)
         if rr_value > 10.0:
             rr_value = 1.0
             logging.warning(f"⚠️ Аномальный R:R ({rr_str}), нормализован до 1.0")
@@ -192,12 +194,13 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
-    if rr_value >= 1.5 and volume_confirmed: 
+    # 📉 СНИЖЕННЫЕ ПОРОГИ для краткосрочной торговли (2-4 часа)
+    if rr_value >= 1.3 and volume_confirmed:  # Было 1.5
         return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 1.2 and volume_confirmed: 
+    elif rr_value >= 1.0 and volume_confirmed:  # Было 1.2
         return ("medium", "🟡", "Средняя вероятность")
-    elif rr_value >= 1.5 and not volume_confirmed: 
-        return ("medium", "", "Хороший R:R, но объем не подтвержден")
+    elif rr_value >= 1.3 and not volume_confirmed:  # Было 1.5
+        return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else: 
         return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
 
