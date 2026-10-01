@@ -42,7 +42,7 @@ class TAEngine:
                 if rsi < 35 and stoch_k < 20:
                     momentum = "Перепроданность (Потенциальный отскок вверх) 🟢"
                 elif rsi > 65 and stoch_k > 80:
-                    momentum = "Перекупленность (Риск коррекции вниз) "
+                    momentum = "Перекупленность (Риск коррекции вниз) 🔴"
             except Exception:
                 rsi, stoch_k = 50.0, 50.0
                 momentum = "Нейтрально ⚪ (RSI недоступен)"
@@ -74,7 +74,7 @@ class TAEngine:
                 elif not price_up and not vol_up:
                     volume_confirmed = "Да ✅ (Падение на объемах)"
                 else:
-                    volume_confirmed = "Нет ️ (Дивергенция! Движение не подтверждено объемом)"
+                    volume_confirmed = "Нет ⚠️ (Дивергенция! Движение не подтверждено объемом)"
             except Exception:
                 volume_confirmed = "Недоступно ⚠️ (PVT не рассчитан)"
 
@@ -87,18 +87,19 @@ class TAEngine:
             except Exception:
                 atr = (float(df['high'].iloc[-1]) - float(df['low'].iloc[-1])) * 1.5
 
-            # 6. УРОВНИ SL/TP С БУФЕРОМ (для краткосрочной торговли 2-4 часа)
-            # Берем последние 20 свечей (4-5 дней на 4H таймфрейме)
-            recent_lows = float(df['low'].iloc[-20:].min())
-            recent_highs = float(df['high'].iloc[-20:].max())
+            # 6. УРОВНИ SL/TP (АДАПТИРОВАНО ПОД 1H ТАЙМФРЕЙМ)
+            # ИЗМЕНЕНО: 48 свечей (было 20) = 2 дня на 1H = значимые уровни
+            recent_lows = float(df['low'].iloc[-48:].min())
+            recent_highs = float(df['high'].iloc[-48:].max())
             
             # Определяем направление
             is_long = "Бычий" in trend
             
             if is_long:
                 # Для лонга: SL ниже поддержки с буфером, TP выше сопротивления
-                sl_level = recent_lows - (atr * 0.5)  # Буфер 0.5 ATR
-                tp_level = recent_highs + (atr * 0.3)  # Буфер 0.3 ATR
+                sl_level = recent_lows - (atr * 0.5)   # Буфер 0.5 ATR (защита капитала)
+                # ИЗМЕНЕНО: буфер 0.25 ATR (было 0.3) — TP ближе для быстрого закрытия за 4-8 часов
+                tp_level = recent_highs + (atr * 0.25)
                 
                 # Точка входа: откат к EMA50 или к середине диапазона
                 entry_level = min(current_price, (recent_lows + recent_highs) / 2)
@@ -108,8 +109,9 @@ class TAEngine:
                     entry_level = max(ema_50, recent_lows + (recent_highs - recent_lows) * 0.3)
             else:
                 # Для шорта: SL выше сопротивления с буфером, TP ниже поддержки
-                sl_level = recent_highs + (atr * 0.5)
-                tp_level = recent_lows - (atr * 0.3)
+                sl_level = recent_highs + (atr * 0.5)  # Буфер 0.5 ATR (защита капитала)
+                # ИЗМЕНЕНО: буфер 0.25 ATR (было 0.3) — TP ближе для быстрого закрытия за 4-8 часов
+                tp_level = recent_lows - (atr * 0.25)
                 
                 # Точка входа: откат к EMA50 или к середине диапазона
                 entry_level = max(current_price, (recent_lows + recent_highs) / 2)
@@ -127,7 +129,7 @@ class TAEngine:
             # 🛡️ ЖЕСТКАЯ ЗАЩИТА: если R:R > 10, нормализуем
             if rr_ratio > 10.0:
                 rr_ratio = 1.0
-                logging.warning(f"️ Аномальный R:R ({rr_ratio}), нормализован до 1.0")
+                logging.warning(f"⚠️ Аномальный R:R ({rr_ratio}), нормализован до 1.0")
 
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
