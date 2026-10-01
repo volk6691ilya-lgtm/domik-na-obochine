@@ -5,7 +5,6 @@ import logging
 import os
 import warnings
 
-# Подавляем безвредные предупреждения о шрифтах matplotlib
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,7 +20,7 @@ class ChartVisualizer:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def generate_signal_chart(self, df: pd.DataFrame, symbol: str, ta_data: dict, filename: str = "signal_chart.png"):
+    def generate_signal_chart(self, df: pd.DataFrame, symbol: str, ta_ dict, filename: str = "signal_chart.png"):
         try:
             if not isinstance(df.index, pd.DatetimeIndex):
                 df.index = pd.to_datetime(df.index)
@@ -31,35 +30,67 @@ class ChartVisualizer:
             tp_level = ta_data.get("tp") or ta_data.get("resistance_level (TP)")
             entry_level = ta_data.get("entry", ta_data.get("price", "N/A"))
 
+            # Определяем направление для расчёта TP1/TP2/TP3
+            is_long = "Бычий" in ta_data.get('trend', '')
+            
+            # Рассчитываем TP1, TP2, TP3 (как в signal_generator.py)
+            if entry_level != "N/A" and tp_level:
+                entry_float = float(entry_level)
+                tp_float = float(tp_level)
+                
+                if is_long:
+                    tp1 = round(entry_float + (tp_float - entry_float) * 0.4, 4)
+                    tp2 = round(entry_float + (tp_float - entry_float) * 0.7, 4)
+                    tp3 = tp_float
+                else:
+                    tp1 = round(entry_float - (entry_float - tp_float) * 0.4, 4)
+                    tp2 = round(entry_float - (entry_float - tp_float) * 0.7, 4)
+                    tp3 = tp_float
+            else:
+                tp1 = tp2 = tp3 = None
+
             hlines = []
             hlines_colors = []
+            hlines_styles = []
 
-            # 1. Стоп-лосс (Зеленый 🟢)
+            # 1. Стоп-лосс (Зеленый 🟢) — жирная линия
             if sl_level:
                 hlines.append(float(sl_level))
-                hlines_colors.append('green')
+                hlines_colors.append('lime')
+                hlines_styles.append('--')
 
-            # 2. Точка входа (Синий 🔵)
+            # 2. Точка входа (Синий 🔵) — жирная линия
             if entry_level and entry_level != "N/A":
                 entry_float = float(entry_level)
-                # Проверка, чтобы не рисовать две линии друг на друге, если цены совпали
                 if entry_float not in hlines:
                     hlines.append(entry_float)
-                    hlines_colors.append('blue')
+                    hlines_colors.append('dodgerblue')
+                    hlines_styles.append('-')
 
-            # 3. Тейк-профит (Красный 🔴)
-            if tp_level:
-                tp_float = float(tp_level)
-                if tp_float not in hlines:
-                    hlines.append(tp_float)
-                    hlines_colors.append('red')
+            # 3. TP1 (Красный 🟠) — тонкая линия (40% движения)
+            if tp1 and tp1 not in hlines:
+                hlines.append(tp1)
+                hlines_colors.append('orange')
+                hlines_styles.append(':')
+
+            # 4. TP2 (Красный 🟠) — тонкая линия (70% движения)
+            if tp2 and tp2 not in hlines:
+                hlines.append(tp2)
+                hlines_colors.append('orangered')
+                hlines_styles.append(':')
+
+            # 5. TP3 (Красный 🔴) — средняя линия (100% движения)
+            if tp3 and tp3 not in hlines:
+                hlines.append(tp3)
+                hlines_colors.append('red')
+                hlines_styles.append('--')
 
             # Настройки стиля графика (похож на TradingView)
             mc = mpf.make_marketcolors(up='g', down='r', edge='i', wick='i', volume='in', inherit=True)
             s = mpf.make_mpf_style(marketcolors=mc, base_mpf_style='charles')
 
-            # Обновленный заголовок с тремя уровнями
-            title = f"{symbol} | Entry: ${entry_level} | SL: ${sl_level} | TP: ${tp_level}"
+            # Обновленный заголовок с TP1/TP2/TP3
+            title = f"{symbol} | Entry: ${entry_level} | SL: ${sl_level} | TP1: ${tp1} | TP2: ${tp2} | TP3: ${tp3}"
             filepath = os.path.join(self.output_dir, filename)
 
             # ГЕНЕРАЦИЯ ГРАФИКА
@@ -71,7 +102,7 @@ class ChartVisualizer:
                 ylabel='Price (USDT)',
                 volume=True,
                 ylabel_lower='Volume',
-                hlines=dict(hlines=hlines, colors=hlines_colors),
+                hlines=dict(hlines=hlines, colors=hlines_colors, linestyle=hlines_styles),
                 savefig=filepath,
                 figratio=(10, 6),
                 figscale=1.2
@@ -86,7 +117,7 @@ class ChartVisualizer:
 
 # Блок для локального тестирования
 if __name__ == "__main__":
-    print("\n--- Тест Chart Visualizer (Генерация графика с Entry, SL, TP) ---")
+    print("\n--- Тест Chart Visualizer (Генерация графика с Entry, SL, TP1/TP2/TP3) ---")
     
     np.random.seed(42)
     dates = pd.date_range(end='2026-09-28', periods=50, freq='1h')
@@ -100,12 +131,13 @@ if __name__ == "__main__":
         'open': opens, 'high': highs, 'low': lows, 'close': closes, 'volume': volumes
     }, index=dates)
 
-    # Обновленные тестовые данные с тремя уровнями
+    # Тестовые данные
     mock_ta_data = {
         "price": 98.50,
-        "entry": 98.00,      # 🔵 Синяя линия
-        "sl": 95.00,         # 🟢 Зеленая линия
-        "tp": 105.00,        # 🔴 Красная линия
+        "entry": 98.00,
+        "sl": 95.00,
+        "tp": 105.00,
+        "trend": "Бычий 🟢 (Цена > EMA50)",
         "estimated_R:R": "1 : 2.5"
     }
 
@@ -114,7 +146,12 @@ if __name__ == "__main__":
     
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
-        print("👉 Открой эту картинку, чтобы увидеть свечи, объемы и 3 цветные линии (Entry, SL, TP)!")
+        print("👉 На графике 5 линий:")
+        print("   🟢 SL (зелёный пунктир)")
+        print("   🔵 Entry (синяя сплошная)")
+        print("   🟠 TP1 (оранжевый пунктир) — 40%")
+        print("   🟠 TP2 (оранжево-красный пунктир) — 70%")
+        print("   🔴 TP3 (красный пунктир) — 100%")
     else:
         print("\n❌ Ошибка при создании графика.")
         
