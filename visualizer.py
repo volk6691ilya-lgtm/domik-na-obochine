@@ -20,7 +20,7 @@ class ChartVisualizer:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def generate_signal_chart(self, df: pd.DataFrame, symbol: str, ta_ dict, filename: str = "signal_chart.png"):
+    def generate_signal_chart(self, df, symbol, ta_data, filename="signal_chart.png"):
         try:
             if not isinstance(df.index, pd.DatetimeIndex):
                 df.index = pd.to_datetime(df.index)
@@ -32,12 +32,16 @@ class ChartVisualizer:
 
             # Определяем направление для расчёта TP1/TP2/TP3
             is_long = "Бычий" in ta_data.get('trend', '')
-            
+
             # Рассчитываем TP1, TP2, TP3 (как в signal_generator.py)
+            tp1 = None
+            tp2 = None
+            tp3 = None
+
             if entry_level != "N/A" and tp_level:
                 entry_float = float(entry_level)
                 tp_float = float(tp_level)
-                
+
                 if is_long:
                     tp1 = round(entry_float + (tp_float - entry_float) * 0.4, 4)
                     tp2 = round(entry_float + (tp_float - entry_float) * 0.7, 4)
@@ -46,20 +50,18 @@ class ChartVisualizer:
                     tp1 = round(entry_float - (entry_float - tp_float) * 0.4, 4)
                     tp2 = round(entry_float - (entry_float - tp_float) * 0.7, 4)
                     tp3 = tp_float
-            else:
-                tp1 = tp2 = tp3 = None
 
             hlines = []
             hlines_colors = []
             hlines_styles = []
 
-            # 1. Стоп-лосс (Зеленый 🟢) — жирная линия
+            # 1. Стоп-лосс (Зеленый) — пунктир
             if sl_level:
                 hlines.append(float(sl_level))
                 hlines_colors.append('lime')
                 hlines_styles.append('--')
 
-            # 2. Точка входа (Синий 🔵) — жирная линия
+            # 2. Точка входа (Синий) — сплошная
             if entry_level and entry_level != "N/A":
                 entry_float = float(entry_level)
                 if entry_float not in hlines:
@@ -67,20 +69,20 @@ class ChartVisualizer:
                     hlines_colors.append('dodgerblue')
                     hlines_styles.append('-')
 
-            # 3. TP1 (Красный 🟠) — тонкая линия (40% движения)
-            if tp1 and tp1 not in hlines:
+            # 3. TP1 (Оранжевый) — точки (40% движения)
+            if tp1 is not None and tp1 not in hlines:
                 hlines.append(tp1)
                 hlines_colors.append('orange')
                 hlines_styles.append(':')
 
-            # 4. TP2 (Красный 🟠) — тонкая линия (70% движения)
-            if tp2 and tp2 not in hlines:
+            # 4. TP2 (Оранжево-красный) — точки (70% движения)
+            if tp2 is not None and tp2 not in hlines:
                 hlines.append(tp2)
                 hlines_colors.append('orangered')
                 hlines_styles.append(':')
 
-            # 5. TP3 (Красный 🔴) — средняя линия (100% движения)
-            if tp3 and tp3 not in hlines:
+            # 5. TP3 (Красный) — пунктир (100% движения)
+            if tp3 is not None and tp3 not in hlines:
                 hlines.append(tp3)
                 hlines_colors.append('red')
                 hlines_styles.append('--')
@@ -115,10 +117,11 @@ class ChartVisualizer:
             logging.error(f"Ошибка при генерации графика: {e}")
             return None
 
+
 # Блок для локального тестирования
 if __name__ == "__main__":
     print("\n--- Тест Chart Visualizer (Генерация графика с Entry, SL, TP1/TP2/TP3) ---")
-    
+
     np.random.seed(42)
     dates = pd.date_range(end='2026-09-28', periods=50, freq='1h')
     closes = np.cumsum(np.random.randn(50)) + 100
@@ -126,7 +129,7 @@ if __name__ == "__main__":
     highs = np.maximum(opens, closes) + np.random.rand(50) * 1.0
     lows = np.minimum(opens, closes) - np.random.rand(50) * 1.0
     volumes = np.random.randint(1000, 5000, 50)
-    
+
     df = pd.DataFrame({
         'open': opens, 'high': highs, 'low': lows, 'close': closes, 'volume': volumes
     }, index=dates)
@@ -143,7 +146,7 @@ if __name__ == "__main__":
 
     visualizer = ChartVisualizer()
     filepath = visualizer.generate_signal_chart(df, "TESTUSDT", mock_ta_data, "test_chart.png")
-    
+
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
         print("👉 На графике 5 линий:")
@@ -154,5 +157,5 @@ if __name__ == "__main__":
         print("   🔴 TP3 (красный пунктир) — 100%")
     else:
         print("\n❌ Ошибка при создании графика.")
-        
+
     print("\n--- Тест завершен ---\n")
