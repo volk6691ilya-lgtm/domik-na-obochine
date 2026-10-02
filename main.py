@@ -94,7 +94,7 @@ def get_smart_session_info():
     }
 
 # ==========================================
-# 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА
+# 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА (ИЗМЕНЕНО)
 # ==========================================
 def get_session_info():
     msk_tz = timezone(timedelta(hours=3))
@@ -104,13 +104,15 @@ def get_session_info():
     if current_hour < 15:
         session_type = "morning"
         session_name = "УТРЕННИЙ"
+        # ИЗМЕНЕНО: используем реальное время запуска вместо стандартного 09:00
         period_start = now_msk.replace(hour=21, minute=0, second=0) - timedelta(days=1)
-        period_text = f"с 21:00 {period_start.strftime('%d.%m')} по 09:00 {now_msk.strftime('%d.%m.%Y')} (ночная сессия)"
+        period_text = f"с {period_start.strftime('%H:%M %d.%m')} по {now_msk.strftime('%H:%M %d.%m.%Y')} (ночная сессия)"
     else:
         session_type = "evening"
         session_name = "ВЕЧЕРНИЙ"
+        # ИЗМЕНЕНО: используем реальное время запуска вместо стандартного 21:00
         period_start = now_msk.replace(hour=9, minute=0, second=0)
-        period_text = f"с 09:00 по 21:00 {now_msk.strftime('%d.%m.%Y')} (дневная сессия)"
+        period_text = f"с {period_start.strftime('%H:%M %d.%m')} по {now_msk.strftime('%H:%M %d.%m.%Y')} (дневная сессия)"
     
     return {
         "type": session_type,
@@ -162,7 +164,7 @@ def get_crypto_data():
         data = response.json()
         
         # Проверка на пустой ответ или ошибку в структуре JSON
-        if not data or 'bitcoin' not in data:
+        if not data or 'bitcoin' not in 
             print("⚠️ CoinGecko вернул некорректный ответ, переключаюсь на Binance...")
             send_error_alert("CoinGecko вернул пустой ответ, использую Binance API")
             return _get_crypto_from_binance()
@@ -170,7 +172,7 @@ def get_crypto_data():
         result = []
         names = {"bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL", "ripple": "XRP", "toncoin": "TON"}
         for key, name in names.items():
-            if key in data:
+            if key in 
                 price = data[key]['usd']
                 change = data[key]['usd_24h_change']
                 volume = data[key].get('usd_24h_vol', 0)
@@ -212,7 +214,7 @@ def _get_crypto_from_binance():
             "TONUSDT": "TON"
         }
         
-        for item in data:
+        for item in 
             symbol = item.get('symbol', '')
             if symbol in symbol_map:
                 name = symbol_map[symbol]
@@ -499,21 +501,31 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     return None
 
 # ==========================================
-# 4. ФУТЕР ПОСТА
+# 4. ФУТЕР ПОСТА (ИЗМЕНЕНО)
 # ==========================================
 def get_post_footer(session_info):
     msk_tz = timezone(timedelta(hours=3))
     now_msk = datetime.now(msk_tz)
+    current_hour = now_msk.hour
     
+    # ИЗМЕНЕНО: умное определение следующего выпуска
     if session_info['type'] == 'morning':
-        next_time, next_type = "21:00", "вечерний"
-        next_date = now_msk.strftime("%d.%m.%Y")
-    else:
-        next_time, next_type = "09:00", "утренний"
-        next_date = (now_msk + timedelta(days=1)).strftime("%d.%m.%Y")
+        # Утренний пост → следующий вечером сегодня
+        next_text = "сегодня вечером после 21:00 МСК"
+    elif session_info['type'] == 'evening':
+        # Вечерний пост → проверяем, в каком мы дне
+        if current_hour < 12:
+            # Если пост вышел после полуночи но до 12:00 → это уже новый день
+            next_text = "сегодня утром с 9:00 МСК"
+        else:
+            # Если пост вышел после 12:00 → завтра утром
+            next_text = "завтра утром с 9:00 МСК"
+    else:  # delayed
+        # Внеплановый пост → стандартное расписание
+        next_text = "завтра утром с 9:00 МСК"
     
     return f"""
-🔔 **СЛЕДУЮЩИЙ ВЫПУСК:** {next_type} обзор в {next_time} МСК ({next_date})
+🔔 **СЛЕДУЮЩИЙ ВЫПУСК:** {next_text}
 
 🔔🚨 **ПОЖАРНЫЙ ШПИОН** — система экстренных оповещений
 Система автоматически мониторит рынки и геополитику 24/7. При резких изменениях (падение/рост >3% за час) в канал придёт экстренный сигнал с графиком, анализом причин и планом действий.
@@ -761,7 +773,7 @@ def send_to_telegram(text, fear_greed=None):
 # 8. ГЛАВНЫЙ ЗАПУСК (С УМНЫМ ПЕРИОДОМ)
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v32.0 (Умный период анализа + Восстановлен идеальный промпт)...")
+    print("🚀 Запуск ИИ Аналитика v33.0 (Умный период + точное время)...")
     
     print("📡 Умное определение типа выпуска...")
     session_info = get_smart_session_info()  # ИЗМЕНЕНО: было get_session_info()
