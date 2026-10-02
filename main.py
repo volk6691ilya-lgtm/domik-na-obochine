@@ -27,6 +27,73 @@ def send_error_alert(message):
             pass  # Не ломаем основной поток, если алерт не отправился
 
 # ==========================================
+# 0.1 УМНЫЙ ПЕРИОД АНАЛИЗА (НОВОЕ)
+# ==========================================
+LAST_POST_FILE = "last_post_time.json"
+
+def get_last_post_time():
+    """Читает время последнего поста из файла"""
+    try:
+        if os.path.exists(LAST_POST_FILE):
+            with open(LAST_POST_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return datetime.fromisoformat(data['last_post_time'])
+    except Exception as e:
+        print(f"⚠️ Не удалось прочитать время последнего поста: {e}")
+    return None
+
+def save_last_post_time():
+    """Сохраняет текущее время как время последнего поста"""
+    try:
+        msk_tz = timezone(timedelta(hours=3))
+        now_msk = datetime.now(msk_tz)
+        with open(LAST_POST_FILE, 'w', encoding='utf-8') as f:
+            json.dump({'last_post_time': now_msk.isoformat()}, f, indent=2)
+        print(f"✅ Время поста сохранено: {now_msk.strftime('%H:%M МСК %d.%m.%Y')}")
+    except Exception as e:
+        print(f"⚠️ Не удалось сохранить время поста: {e}")
+
+def get_smart_session_info():
+    """
+    Умное определение периода анализа:
+    - Если последний пост был недавно (< 6 часов) → стандартный период
+    - Если последний пост был давно (> 6 часов) → период с последнего поста до сейчас
+    """
+    msk_tz = timezone(timedelta(hours=3))
+    now_msk = datetime.now(msk_tz)
+    
+    # Читаем время последнего поста
+    last_post_time = get_last_post_time()
+    
+    # Если нет последнего поста или он очень старый (> 24 часов) → стандартный период
+    if last_post_time is None or (now_msk - last_post_time).total_seconds() > 24 * 3600:
+        print("📊 Используем стандартный период (нет истории или старая)")
+        return get_session_info()
+    
+    # Рассчитываем часы с последнего поста
+    hours_since_last = (now_msk - last_post_time).total_seconds() / 3600
+    
+    # Если последний пост был недавно (< 6 часов) → стандартный период
+    if hours_since_last < 6:
+        print(f"📊 Последний пост был {hours_since_last:.1f} часов назад → стандартный период")
+        return get_session_info()
+    
+    # Если задержка > 6 часов → умный период с последнего поста до сейчас
+    print(f"⚠️ Обнаружена задержка {hours_since_last:.1f} часов. Период анализа скорректирован.")
+    
+    session_type = "delayed"
+    session_name = "ВНЕПЛАНОВЫЙ"
+    period_text = f"с {last_post_time.strftime('%H:%M %d.%m')} по {now_msk.strftime('%H:%M %d.%m.%Y')} ({round(hours_since_last, 1)} часов)"
+    
+    return {
+        "type": session_type,
+        "name": session_name,
+        "period": period_text,
+        "date": now_msk.strftime("%d.%m.%Y"),
+        "time": now_msk.strftime("%H:%M")
+    }
+
+# ==========================================
 # 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА
 # ==========================================
 def get_session_info():
@@ -477,10 +544,6 @@ def smart_split_text(text, max_len=3800):
             '🌐 **4.' in line or '🌐 4.' in line,
             '💻 **5.' in line or '💻 5.' in line,
             '🔗 **' in line,
-            ' **' in line,
-            ' **' in line,
-            '️ **' in line,
-            '️ **' in line,
             ' **ИИ АНАЛИТИК' in line,
             '📈 **ПЕРИОД' in line,
         ])
@@ -695,13 +758,13 @@ def send_to_telegram(text, fear_greed=None):
             print(f"❌ Ошибка части {i+1}: {response.text}")
 
 # ==========================================
-# 8. ГЛАВНЫЙ ЗАПУСК
+# 8. ГЛАВНЫЙ ЗАПУСК (С УМНЫМ ПЕРИОДОМ)
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v31.7 (Восстановлен идеальный промпт + исправлены технические ошибки)...")
+    print("🚀 Запуск ИИ Аналитика v32.0 (Умный период анализа + Восстановлен идеальный промпт)...")
     
-    print("📡 Определение типа выпуска...")
-    session_info = get_session_info()
+    print("📡 Умное определение типа выпуска...")
+    session_info = get_smart_session_info()  # ИЗМЕНЕНО: было get_session_info()
     print(f"   Тип: {session_info['name']} выпуск")
     print(f"   Период: {session_info['period']}")
     
@@ -753,6 +816,10 @@ def main():
     
     print("📤 Публикация...")
     send_to_telegram(full_text, fear_greed)
+    
+    # СОХРАНЯЕМ ВРЕМЯ ПУБЛИКАЦИИ (НОВОЕ)
+    save_last_post_time()
+    
     print("✅ Миссия выполнена.")
 
 if __name__ == "__main__":
