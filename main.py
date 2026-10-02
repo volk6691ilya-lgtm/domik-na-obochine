@@ -164,7 +164,7 @@ def get_crypto_data():
         data = response.json()
         
         # Проверка на пустой ответ или ошибку в структуре JSON
-        if not data or 'bitcoin' not in 
+        if not data or 'bitcoin' not in data:
             print("⚠️ CoinGecko вернул некорректный ответ, переключаюсь на Binance...")
             send_error_alert("CoinGecko вернул пустой ответ, использую Binance API")
             return _get_crypto_from_binance()
@@ -172,7 +172,7 @@ def get_crypto_data():
         result = []
         names = {"bitcoin": "BTC", "ethereum": "ETH", "solana": "SOL", "ripple": "XRP", "toncoin": "TON"}
         for key, name in names.items():
-            if key in 
+            if key in data: 
                 price = data[key]['usd']
                 change = data[key]['usd_24h_change']
                 volume = data[key].get('usd_24h_vol', 0)
@@ -214,7 +214,7 @@ def _get_crypto_from_binance():
             "TONUSDT": "TON"
         }
         
-        for item in 
+        for item in data: 
             symbol = item.get('symbol', '')
             if symbol in symbol_map:
                 name = symbol_map[symbol]
