@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 # ==========================================
-# 0. НАБЛЮДАЕМОСТЬ (НОВОЕ)
+# 0. НАБЛЮДАЕМОСТЬ
 # ==========================================
 def send_error_alert(message):
     """Отправляет уведомление об ошибке в системный канал"""
@@ -27,76 +27,14 @@ def send_error_alert(message):
             pass  # Не ломаем основной поток, если алерт не отправился
 
 # ==========================================
-# 0.1 УМНЫЙ ПЕРИОД АНАЛИЗА (НОВОЕ)
-# ==========================================
-LAST_POST_FILE = "last_post_time.json"
-
-def get_last_post_time():
-    """Читает время последнего поста из файла"""
-    try:
-        if os.path.exists(LAST_POST_FILE):
-            with open(LAST_POST_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return datetime.fromisoformat(data['last_post_time'])
-    except Exception as e:
-        print(f"⚠️ Не удалось прочитать время последнего поста: {e}")
-    return None
-
-def save_last_post_time():
-    """Сохраняет текущее время как время последнего поста"""
-    try:
-        msk_tz = timezone(timedelta(hours=3))
-        now_msk = datetime.now(msk_tz)
-        with open(LAST_POST_FILE, 'w', encoding='utf-8') as f:
-            json.dump({'last_post_time': now_msk.isoformat()}, f, indent=2)
-        print(f"✅ Время поста сохранено: {now_msk.strftime('%H:%M МСК %d.%m.%Y')}")
-    except Exception as e:
-        print(f"⚠️ Не удалось сохранить время поста: {e}")
-
-def get_smart_session_info():
-    """
-    Умное определение периода анализа:
-    - Если последний пост был недавно (< 6 часов) → стандартный период
-    - Если последний пост был давно (> 6 часов) → период с последнего поста до сейчас
-    """
-    msk_tz = timezone(timedelta(hours=3))
-    now_msk = datetime.now(msk_tz)
-    
-    # Читаем время последнего поста
-    last_post_time = get_last_post_time()
-    
-    # Если нет последнего поста или он очень старый (> 24 часов) → стандартный период
-    if last_post_time is None or (now_msk - last_post_time).total_seconds() > 24 * 3600:
-        print("📊 Используем стандартный период (нет истории или старая)")
-        return get_session_info()
-    
-    # Рассчитываем часы с последнего поста
-    hours_since_last = (now_msk - last_post_time).total_seconds() / 3600
-    
-    # Если последний пост был недавно (< 6 часов) → стандартный период
-    if hours_since_last < 6:
-        print(f"📊 Последний пост был {hours_since_last:.1f} часов назад → стандартный период")
-        return get_session_info()
-    
-    # Если задержка > 6 часов → умный период с последнего поста до сейчас
-    print(f"⚠️ Обнаружена задержка {hours_since_last:.1f} часов. Период анализа скорректирован.")
-    
-    session_type = "delayed"
-    session_name = "ВНЕПЛАНОВЫЙ"
-    period_text = f"с {last_post_time.strftime('%H:%M %d.%m')} по {now_msk.strftime('%H:%M %d.%m.%Y')} ({round(hours_since_last, 1)} часов)"
-    
-    return {
-        "type": session_type,
-        "name": session_name,
-        "period": period_text,
-        "date": now_msk.strftime("%d.%m.%Y"),
-        "time": now_msk.strftime("%H:%M")
-    }
-
-# ==========================================
-# 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА (ИЗМЕНЕНО)
+# 1. ОПРЕДЕЛЕНИЕ ТИПА ВЫПУСКА (ЖЕСТКАЯ ЛОГИКА 12 ЧАСОВ)
 # ==========================================
 def get_session_info():
+    """
+    Гарантирует строгий 12-часовой период анализа:
+    - Утренний запуск (00:00 - 14:59 МСК): анализирует с 21:00 вчерашнего дня до сейчас.
+    - Вечерний запуск (15:00 - 23:59 МСК): анализирует с 09:00 сегодняшнего дня до сейчас.
+    """
     msk_tz = timezone(timedelta(hours=3))
     now_msk = datetime.now(msk_tz)
     current_hour = now_msk.hour
@@ -104,13 +42,13 @@ def get_session_info():
     if current_hour < 15:
         session_type = "morning"
         session_name = "УТРЕННИЙ"
-        # ИЗМЕНЕНО: используем реальное время запуска вместо стандартного 09:00
+        # Старт в 21:00 предыдущего дня
         period_start = now_msk.replace(hour=21, minute=0, second=0) - timedelta(days=1)
         period_text = f"с {period_start.strftime('%H:%M %d.%m')} по {now_msk.strftime('%H:%M %d.%m.%Y')} (ночная сессия)"
     else:
         session_type = "evening"
         session_name = "ВЕЧЕРНИЙ"
-        # ИЗМЕНЕНО: используем реальное время запуска вместо стандартного 21:00
+        # Старт в 09:00 текущего дня
         period_start = now_msk.replace(hour=9, minute=0, second=0)
         period_text = f"с {period_start.strftime('%H:%M %d.%m')} по {now_msk.strftime('%H:%M %d.%m.%Y')} (дневная сессия)"
     
@@ -155,15 +93,12 @@ def get_crypto_data():
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,toncoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true"
         response = requests.get(url, timeout=10)
         
-        # Если CoinGecko вернул ошибку (например, 429 - лимит запросов)
         if response.status_code != 200:
             print(f"⚠️ CoinGecko вернул статус {response.status_code}, переключаюсь на Binance...")
             send_error_alert(f"CoinGecko недоступен (статус {response.status_code}), использую Binance API")
             return _get_crypto_from_binance()
         
         data = response.json()
-        
-        # Проверка на пустой ответ или ошибку в структуре JSON
         if not data or 'bitcoin' not in data:
             print("⚠️ CoinGecko вернул некорректный ответ, переключаюсь на Binance...")
             send_error_alert("CoinGecko вернул пустой ответ, использую Binance API")
@@ -187,11 +122,9 @@ def get_crypto_data():
         send_error_alert(f"CoinGecko упал: {str(e)[:100]}. Переключаюсь на Binance.")
         return _get_crypto_from_binance()
 
-
 def _get_crypto_from_binance():
-    """Резервный источник: Binance публичный API (не требует ключа, очень стабильный)"""
+    """Резервный источник: Binance публичный API"""
     try:
-        # Запрашиваем данные сразу по всем нужным парам
         url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","TONUSDT"]'
         response = requests.get(url, timeout=10)
         
@@ -205,14 +138,7 @@ def _get_crypto_from_binance():
             return "• Крипта: Данные временно недоступны"
         
         result = []
-        # Маппинг символов Binance на наши короткие названия
-        symbol_map = {
-            "BTCUSDT": "BTC",
-            "ETHUSDT": "ETH",
-            "SOLUSDT": "SOL",
-            "XRPUSDT": "XRP",
-            "TONUSDT": "TON"
-        }
+        symbol_map = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "SOLUSDT": "SOL", "XRPUSDT": "XRP", "TONUSDT": "TON"}
         
         for item in data: 
             symbol = item.get('symbol', '')
@@ -220,10 +146,8 @@ def _get_crypto_from_binance():
                 name = symbol_map[symbol]
                 price = float(item.get('lastPrice', 0))
                 change = float(item.get('priceChangePercent', 0))
-                volume = float(item.get('quoteVolume', 0))  # Объем торгов в USDT
+                volume = float(item.get('quoteVolume', 0))
                 vol_billion = volume / 1_000_000_000
-                
-                # Форматируем В ТОЧНОСТИ так же, как CoinGecko, чтобы ИИ ничего не заметил
                 result.append(f"• {name}: ${price:,.2f} ({change:+.2f}%) | Объем: ${vol_billion:.2f}B")
         
         if result:
@@ -314,7 +238,6 @@ def get_news_data():
                 title = entry.title
                 link = entry.get('link', '')
 
-                # ИСПРАВЛЕНО: пропускаем новости без ссылок или с подозрительными заголовками
                 if not link or len(title) < 20:
                     continue
                     
@@ -330,7 +253,7 @@ def get_news_data():
         return "• Новости: Ошибка сбора данных"
 
 # ==========================================
-# 3. ИИ-АНАЛИЗ (ИСПРАВЛЕННЫЙ ПРОМПТ: защита от утечки инструкций)
+# 3. ИИ-АНАЛИЗ
 # ==========================================
 def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resistance, finance, news):
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -501,28 +424,14 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     return None
 
 # ==========================================
-# 4. ФУТЕР ПОСТА (ИЗМЕНЕНО)
+# 4. ФУТЕР ПОСТА
 # ==========================================
 def get_post_footer(session_info):
-    msk_tz = timezone(timedelta(hours=3))
-    now_msk = datetime.now(msk_tz)
-    current_hour = now_msk.hour
-    
-    # ИЗМЕНЕНО: умное определение следующего выпуска
+    # Жесткая логика: Утро -> следующий вечером сегодня. Вечер -> следующий утром завтра.
     if session_info['type'] == 'morning':
-        # Утренний пост → следующий вечером сегодня
-        next_text = "сегодня вечером после 21:00 МСК"
-    elif session_info['type'] == 'evening':
-        # Вечерний пост → проверяем, в каком мы дне
-        if current_hour < 12:
-            # Если пост вышел после полуночи но до 12:00 → это уже новый день
-            next_text = "сегодня утром с 9:00 МСК"
-        else:
-            # Если пост вышел после 12:00 → завтра утром
-            next_text = "завтра утром с 9:00 МСК"
-    else:  # delayed
-        # Внеплановый пост → стандартное расписание
-        next_text = "завтра утром с 9:00 МСК"
+        next_text = "сегодня вечером в 21:00 МСК"
+    else:
+        next_text = "завтра утром в 09:00 МСК"
     
     return f"""
 🔔 **СЛЕДУЮЩИЙ ВЫПУСК:** {next_text}
@@ -537,18 +446,10 @@ def get_post_footer(session_info):
 # 5. УМНОЕ РАЗДЕЛЕНИЕ НА ЧАСТИ
 # ==========================================
 def smart_split_text(text, max_len=3800):
-    """
-    Разбивает текст на части, НЕ разрывая:
-    1. Целые разделы (🪙 1. КРИПТОРЫНОК, 🌐 4. ГЕОПОЛИТИКА и т.д.)
-    2. Отдельные новости (заголовок + ссылка)
-    3. Абзацы внутри разделов
-    """
-    # Шаг 1: Разбиваем текст на логические разделы
     sections = []
     current_section = []
     
     for line in text.split('\n'):
-        # Проверяем, начинается ли строка с заголовка раздела
         is_section_header = any([
             '🪙 **1.' in line,
             '🛢️ **2.' in line,
@@ -561,36 +462,30 @@ def smart_split_text(text, max_len=3800):
         ])
         
         if is_section_header and current_section:
-            # Сохраняем предыдущий раздел
             sections.append('\n'.join(current_section))
             current_section = [line]
         else:
             current_section.append(line)
     
-    # Добавляем последний раздел
     if current_section:
         sections.append('\n'.join(current_section))
     
-    # Шаг 2: Собираем части, не разрывая разделы
     parts = []
     current_part = []
     current_length = 0
     
     for section in sections:
-        section_length = len(section) + 2  # +2 для \n\n
+        section_length = len(section) + 2
         
-        # Если раздел помещается в текущую часть
         if current_length + section_length <= max_len:
             current_part.append(section)
             current_length += section_length
         else:
-            # Если текущая часть не пустая — сохраняем её
             if current_part:
                 parts.append('\n\n'.join(current_part).strip())
                 current_part = []
                 current_length = 0
             
-            # Если раздел слишком большой для одной части — разбиваем его по абзацам
             if section_length > max_len:
                 paragraphs = section.split('\n\n')
                 for para in paragraphs:
@@ -608,7 +503,6 @@ def smart_split_text(text, max_len=3800):
                                 current_part = [para]
                                 current_length = para_length
                     else:
-                        # Если абзац слишком большой — режем по строкам
                         lines = para.split('\n')
                         temp_para = []
                         temp_length = 0
@@ -626,18 +520,16 @@ def smart_split_text(text, max_len=3800):
                             current_part.append('\n'.join(temp_para))
                             current_length = sum(len(p) for p in current_part) + len(current_part) * 2
             else:
-                # Раздел помещается целиком в новую часть
                 current_part = [section]
                 current_length = section_length
     
-    # Добавляем последнюю часть
     if current_part:
         parts.append('\n\n'.join(current_part).strip())
     
     return parts
 
 # ==========================================
-# 6. КОЛЛЕКЦИЯ КАРТИНОК (CLOUDINARY)
+# 6. КОЛЛЕКЦИЯ КАРТИНОК
 # ==========================================
 COVER_IMAGES = {
     'bullish': [
@@ -770,13 +662,13 @@ def send_to_telegram(text, fear_greed=None):
             print(f"❌ Ошибка части {i+1}: {response.text}")
 
 # ==========================================
-# 8. ГЛАВНЫЙ ЗАПУСК (С УМНЫМ ПЕРИОДОМ)
+# 8. ГЛАВНЫЙ ЗАПУСК
 # ==========================================
 def main():
-    print("🚀 Запуск ИИ Аналитика v33.0 (Умный период + точное время)...")
+    print("🚀 Запуск ИИ Аналитика v34.0 (Строгий 12-часовой цикл)...")
     
-    print("📡 Умное определение типа выпуска...")
-    session_info = get_smart_session_info()  # ИЗМЕНЕНО: было get_session_info()
+    print("📡 Определение типа выпуска...")
+    session_info = get_session_info()  # Используем строгую логику без JSON-кэша
     print(f"   Тип: {session_info['name']} выпуск")
     print(f"   Период: {session_info['period']}")
     
@@ -828,9 +720,6 @@ def main():
     
     print("📤 Публикация...")
     send_to_telegram(full_text, fear_greed)
-    
-    # СОХРАНЯЕМ ВРЕМЯ ПУБЛИКАЦИИ (НОВОЕ)
-    save_last_post_time()
     
     print("✅ Миссия выполнена.")
 
