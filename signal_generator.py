@@ -13,6 +13,7 @@ from macro_calendar import MacroCalendar
 from ta_engine import TAEngine
 from pattern_recognition import PatternRecognizer
 from visualizer import ChartVisualizer
+from ai_models_config import get_models_for_task
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
