@@ -238,17 +238,22 @@ def get_news_data():
             for entry in feed.entries[:3]:
                 title = entry.title
                 link = entry.get('link', '')
-
-                if not link or len(title) < 20:
+                
+                # Берем краткую выжимку (summary) или первые 100 символов заголовка, если summary нет
+                summary = entry.get('summary', '')
+                short_summary = summary[:120] + '...' if len(summary) > 120 else (title[:100] + '...' if len(title) > 100 else title)
+                
+                if not link or len(short_summary) < 20:
                     continue
                     
                 time_ago = format_time_ago(entry.get('published_parsed'))
-                title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
+                # Экранируем спецсимволы для Telegram Markdown
+                summary_safe = short_summary.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
                 time_prefix = f"[{time_ago}] " if time_ago else ""
-                if link:
-                    headlines.append(f"• {time_prefix}[{title_safe}]({link})")
-                else:
-                    headlines.append(f"• {time_prefix}{title_safe}")
+                
+                # Формат: • [2 ч. назад] Краткая суть новости... [источник](ссылка)
+                headlines.append(f"• {time_prefix}{summary_safe} [источник]({link})")
+                
         return "\n".join(headlines[:5])
     except Exception as e:
         return "• Новости: Ошибка сбора данных"
@@ -367,11 +372,8 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
 - [цвет] NVIDIA: [из данных] — [комментарий]
 - [цвет] DXY: [из данных] — [комментарий]
 
-**⚠️ РИСК-ПРЕДУПРЕЖДЕНИЕ:**
-"Торговля на финансовых рынках сопряжена с высоким риском потери средств. Вы можете потерять ВЕСЬ депозит. Никогда не инвестируйте больше, чем готовы потерять полностью."
-
 **⚖️ ДИСКЛЕЙМЕР:**
-"⚠️ Вся информация носит ИСКЛЮЧИТЕЛЬНО ознакомительный характер и НЕ является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с высоким риском потери средств (вплоть до 100% депозита). Вы действуете на свой страх и риск (DYOR). Прошлые результаты не гарантируют будущую прибыль."
+"⚠️ Не является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с риском потери средств. Проводите собственное исследование (DYOR)."
 
 ПРАВИЛА СТИЛЯ:
 - Тон: профессиональный, но живой (не сухой)
