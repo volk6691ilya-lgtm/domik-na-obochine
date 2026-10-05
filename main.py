@@ -8,6 +8,7 @@ import feedparser
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from ai_models_config import get_models_for_task
 
 # ==========================================
 # 0. НАБЛЮДАЕМОСТЬ
@@ -259,19 +260,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
     api_key = os.environ.get("OPENROUTER_API_KEY")
     url = "https://openrouter.ai/api/v1/chat/completions"
     
-    models = [
-        "inclusionai/ling-3.0-flash-fin:free",
-        "nvidia/nemotron-3-super-120b-a12b:free",
-        "google/gemma-4-31b-it:free",
-        "google/gemma-4-26b-a4b-it:free",
-        "nvidia/nemotron-3.5-lightning:free",
-        "cohere/north-mini-code:free",
-        "inclusionai/ling-3.0-flash-sante:free",
-        "dots-studio/dots-3-note-preview:free",
-        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-        "nvidia/nemotron-3.5-content-safety:free",
-        "liquid/lfm-2.5-2.6b:free",
-    ]
+    models = get_models_for_task('main')
     
     fg_value, fg_class = fear_greed
     btc_dom = global_data['btc_dominance']
