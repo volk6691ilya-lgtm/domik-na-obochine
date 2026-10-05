@@ -4,7 +4,7 @@ on:
   schedule:
     # Запускается каждые 15 минут
     - cron: '*/15 * * * *'
-  workflow_dispatch: # Ручной запуск для тестов
+  workflow_dispatch: # Ручной запуск
 
 jobs:
   smart-fire-spy:
@@ -22,6 +22,15 @@ jobs:
         run: |
           pip install requests yfinance feedparser
           
+      # 🧠 ВОССТАНАВЛИВАЕМ файл last_signals.json из кэша
+      - name: Restore last signals
+        uses: actions/cache@v3
+        with:
+          path: last_signals.json
+          key: ${{ runner.os }}-last-signals
+          restore-keys: |
+            ${{ runner.os }}-last-signals
+          
       - name: Run Smart Fire Spy
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -29,3 +38,5 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           python smart_fire_spy.py
+          
+      # 💾 actions/cache автоматически сохранит обновленный last_signals.json
