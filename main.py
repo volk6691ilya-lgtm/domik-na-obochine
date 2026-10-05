@@ -409,7 +409,7 @@ def get_ai_analysis(session_info, fear_greed, global_data, crypto, support_resis
         except Exception:
             continue
     
-    send_error_alert("КРИТИЧЕСКИЙ СБОЙ: Все 11 ИИ-моделей недоступны.")
+    send_error_alert(f"КРИТИЧЕСКИЙ СБОЙ: Все {len(models)} ИИ-моделей из конфигурации недоступны.")
     return None
 
 # ==========================================
