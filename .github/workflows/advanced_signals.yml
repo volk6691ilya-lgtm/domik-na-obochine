@@ -2,7 +2,7 @@ name: Advanced Trading Signals (Moon Watch v2.1)
 
 on:
   schedule:
-        # Запускается 5 раз в сутки: 01:00, 05:00, 10:00, 15:00, 20:00 МСК
+    # Запускается 5 раз в сутки: 01:00, 05:00, 10:00, 15:00, 20:00 МСК
     # В UTC это: 22:00 (пред. дня), 02:00, 07:00, 12:00, 17:00
     - cron: '0 22,2,7,12,17 * * *'
   workflow_dispatch:  # Ручной запуск для тестов
@@ -25,6 +25,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests python-dotenv yfinance feedparser pandas matplotlib ta scipy mplfinance
           
+      #  ВОССТАНАВЛИВАЕМ last_signals.json из кэша (чтобы проверять дубликаты)
+      - name: Restore last signals
+        uses: actions/cache@v3
+        with:
+          path: last_signals.json
+          key: ${{ runner.os }}-last-signals
+          restore-keys: |
+            ${{ runner.os }}-last-signals
+          
       - name: Run Signal Generator
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -32,3 +41,10 @@ jobs:
           CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
         run: |
           python signal_generator.py
+          
+      # 💾 Сохраняем обновленный last_signals.json в кэш (для Умного Пожарного Бота)
+      - name: Save last signals
+        uses: actions/cache/save@v3
+        with:
+          path: last_signals.json
+          key: ${{ runner.os }}-last-signals-${{ github.run_id }}
