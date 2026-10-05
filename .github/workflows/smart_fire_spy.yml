@@ -1,0 +1,31 @@
+name: Smart Fire Spy Monitor
+
+on:
+  schedule:
+    # Запускается каждые 15 минут
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Ручной запуск для тестов
+
+jobs:
+  smart-fire-spy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies
+        run: |
+          pip install requests yfinance feedparser
+          
+      - name: Run Smart Fire Spy
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python smart_fire_spy.py
