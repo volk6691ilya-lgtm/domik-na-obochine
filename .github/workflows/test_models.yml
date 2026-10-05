@@ -1,0 +1,24 @@
+   name: Test All Models Unified
+
+   on:
+     workflow_dispatch: # Запускается только вручную по кнопке
+
+   jobs:
+     test-models:
+       runs-on: ubuntu-latest
+       steps:
+         - name: Checkout code
+           uses: actions/checkout@v3
+           
+         - name: Set up Python
+           uses: actions/setup-python@v4
+           with:
+             python-version: '3.10'
+             
+         - name: Install dependencies
+           run: pip install requests
+           
+         - name: Run Unified Test
+           env:
+             OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+           run: python test_models_unified.py
