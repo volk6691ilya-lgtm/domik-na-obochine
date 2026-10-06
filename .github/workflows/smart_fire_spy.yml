@@ -2,7 +2,7 @@ name: Smart Fire Spy Monitor
 
 on:
   schedule:
-    # Запускается каждые 15 минут
+    # Запускается каждые 15 минут (мониторинг цены)
     - cron: '*/15 * * * *'
   workflow_dispatch: # Ручной запуск
 
@@ -12,18 +12,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        
+      
+      # ⏰ ПРОВЕРКА: есть ли активный сигнал для мониторинга
+      - name: Check if monitoring is needed
+        id: timecheck
+        run: |
+          # Проверяем, есть ли файл last_signals.json в кэше
+          if [ -f "last_signals.json" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ Есть активный сигнал — мониторим"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "⏸️ Нет активных сигналов — пропускаем"
+          fi
+          
       - name: Set up Python
+        if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
           
       - name: Install dependencies
+        if: steps.timecheck.outputs.should_run == 'true'
         run: |
           pip install requests yfinance feedparser
           
       # 🧠 ВОССТАНАВЛИВАЕМ файл last_signals.json из кэша
       - name: Restore last signals
+        if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/cache@v3
         with:
           path: last_signals.json
@@ -32,6 +48,7 @@ jobs:
             ${{ runner.os }}-last-signals
           
       - name: Run Smart Fire Spy
+        if: steps.timecheck.outputs.should_run == 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
