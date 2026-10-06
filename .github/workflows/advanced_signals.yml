@@ -47,4 +47,4 @@ jobs:
         uses: actions/cache/save@v3
         with:
           path: last_signals.json
-          key: ${{ runner.os }}-last-signals-${{ github.run_id }}
+          key: ${{ runner.os }}-last-signals
