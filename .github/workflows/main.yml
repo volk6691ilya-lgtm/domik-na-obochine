@@ -2,7 +2,7 @@ name: Fire Spy Main Run
 
 on:
   schedule:
-    # Запускаем каждый час для точности ±1 час
+    # Запускаем каждый час для точности ±20 минут
     - cron: '0 * * * *'
   workflow_dispatch:
 
@@ -12,20 +12,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      #  ПРОВЕРКА ВРЕМЕНИ (занимает ~2 секунды)
+      # ⏰ СТРОГАЯ ПРОВЕРКА ВРЕМЕНИ (максимум 20 минут задержки)
       - name: Check if it's time to post
         id: timecheck
         run: |
           HOUR=$(TZ='Europe/Moscow' date +%H)
-          if [ "$HOUR" = "09" ] || [ "$HOUR" = "21" ]; then
+          MINUTE=$(TZ='Europe/Moscow' date +%M)
+          echo "Текущее время МСК: ${HOUR}:${MINUTE}"
+          
+          # Проверяем час (09 или 21) И минуту (≤ 20)
+          if [[ ("$HOUR" = "09" || "$HOUR" = "21") && "$MINUTE" -le 20 ]]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
-            echo "✅ Время поста: ${HOUR}:00 МСК"
+            echo "✅ Время поста: ${HOUR}:${MINUTE} МСК"
           else
             echo "should_run=false" >> $GITHUB_OUTPUT
-            echo "⏸️ Сейчас ${HOUR}:00 МСК — не время для поста"
+            echo "⏸️ Сейчас ${HOUR}:${MINUTE} МСК — не время для поста"
           fi
       
-      # Все остальные шаги выполняются ТОЛЬКО если время правильное
       - name: Set up Python
         if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/setup-python@v4
