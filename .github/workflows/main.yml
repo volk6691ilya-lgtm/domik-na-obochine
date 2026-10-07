@@ -2,8 +2,9 @@ name: Fire Spy Main Run
 
 on:
   schedule:
-    # Запускаем каждый час для точности ±20 минут
-    - cron: '0 * * * *'
+    # Нативный планировщик GitHub. 06:00 UTC = 09:00 МСК, 18:00 UTC = 21:00 МСК
+    - cron: '0 6 * * *'
+    - cron: '0 18 * * *'
   workflow_dispatch:
 
 jobs:
@@ -11,38 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      # ⏰ СТРОГАЯ ПРОВЕРКА ВРЕМЕНИ (максимум 20 минут задержки)
-      - name: Check if it's time to post
-        id: timecheck
-        run: |
-          HOUR=$(TZ='Europe/Moscow' date +%H)
-          MINUTE=$(TZ='Europe/Moscow' date +%M)
-          echo "Текущее время МСК: ${HOUR}:${MINUTE}"
-          
-          # Проверяем час (09 или 21) И минуту (≤ 20)
-          if [[ ("$HOUR" = "09" || "$HOUR" = "21") && "$MINUTE" -le 20 ]]; then
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            echo "✅ Время поста: ${HOUR}:${MINUTE} МСК"
-          else
-            echo "should_run=false" >> $GITHUB_OUTPUT
-            echo "⏸️ Сейчас ${HOUR}:${MINUTE} МСК — не время для поста"
-          fi
-      
-      - name: Set up Python
-        if: steps.timecheck.outputs.should_run == 'true'
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      
-      - name: Install dependencies
-        if: steps.timecheck.outputs.should_run == 'true'
-        run: pip install yfinance requests feedparser pandas matplotlib
-      
-      - name: Run main.py
-        if: steps.timecheck.outputs.should_run == 'true'
+      - run: pip install yfinance requests feedparser pandas matplotlib
+      - run: python main.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: python main.py
