@@ -2,8 +2,9 @@ name: Advanced Trading Signals
 
 on:
   schedule:
-    # 02:00, 06:00, 11:00, 15:00, 19:00, 22:00, 23:00 МСК (UTC = МСК - 3 часа)
-    - cron: '0 23,3,8,12,16,19,20 * * *'
+    # 02:16, 06:16, 11:16, 15:16, 19:16, 22:16, 23:16 МСК (UTC = МСК - 3 часа)
+    - cron: '16 23,3,8,12,16,19,20 * * *'
+      timezone: 'Europe/Moscow'
   workflow_dispatch:
 
 jobs:
