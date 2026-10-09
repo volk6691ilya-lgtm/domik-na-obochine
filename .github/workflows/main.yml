@@ -1,9 +1,9 @@
 name: Fire Spy Main Run
 
 on:
-  schedule:
-    # 09:12 и 21:12 МСК (UTC = МСК - 3 часа). Сдвиг на 12 мин помогает избежать очередей GitHub.
-    - cron: '12 6,18 * * *'
+ # schedule:
+ #  # 09:12 и 21:12 МСК (UTC = МСК - 3 часа). Сдвиг на 12 мин помогает избежать очередей GitHub.
+ #   - cron: '12 6,18 * * *'
   workflow_dispatch:
 
 jobs:
