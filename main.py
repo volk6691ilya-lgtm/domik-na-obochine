@@ -39,12 +39,12 @@ def get_session_info():
         session_type = "morning"
         session_name = "УТРЕННИЙ"
         period_start = now_msk.replace(hour=21, minute=0, second=0) - timedelta(days=1)
-        period_text = f"с {period_start.strftime('%d.%m')} по {now_msk.strftime('%d.%m.%Y')} (ночная сессия)"
+        period_text = f"с 21:00 {period_start.strftime('%d.%m')} по 09:00 {now_msk.strftime('%d.%m.%Y')} (ночная сессия)"
     else:
         session_type = "evening"
         session_name = "ВЕЧЕРНИЙ"
         period_start = now_msk.replace(hour=9, minute=0, second=0)
-        period_text = f"с {period_start.strftime('%H:%M %d.%m')} по {now_msk.strftime('%H:%M %d.%m.%Y')} (дневная сессия)"
+        period_text = f"с 09:00 по 21:00 {now_msk.strftime('%d.%m.%Y')} (дневная сессия)"
     
     return {
         "type": session_type,
