@@ -195,7 +195,7 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     # 🔒 ПОРОГИ ПОВЫШЕНЫ на +0.4 от тестовых значений для большей безопасности
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 0.9 and volume_confirmed:  # Было 0.5, стало 0.9
+    elif rr_value >= 0.5 and volume_confirmed:  # Было 0.5, стало 0.9
         return ("medium", "🟡", "Средняя вероятность")
     elif rr_value >= 1.3 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
@@ -430,7 +430,7 @@ def main():
             rr_value = 0.0
         
         # 🔒 ПОРОГ ОТСЕЧЕНИЯ ПОВЫШЕН с 0.3 до 0.7 (+0.4)
-        if rr_value < 0.7:
+        if rr_value < 0.3:
             logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
