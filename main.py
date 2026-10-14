@@ -171,7 +171,7 @@ def get_news_data():
                 time_ago = format_time_ago(entry.get('published_parsed'))
                 title_safe = title.replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
                 time_prefix = f"[{time_ago}] " if time_ago else ""
-                headlines.append(f"• {time_prefix}[{title_safe}]({link})")  # Старый, правильный формат ссылки
+                headlines.append(f"• {time_prefix}[{title_safe}]({link})")  # Кликабельная ссылка
         return "\n".join(headlines[:5])
     except Exception as e:
         return "• Новости: Ошибка сбора данных"
