@@ -462,7 +462,7 @@ def main():
             post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
             send_to_telegram(post_text, chart_path, best_coin['symbol'])
     else:
-        logging.error("❌ СБОЙ: Не удалось получить данные ни для одной монеты.")
+        logging.info("✅ Рынок во флэте. Ни одна монета не прошла строгий фильтр качества. Сигналы не отправлены (капитал защищен).")
 
 if __name__ == "__main__":
     main()
