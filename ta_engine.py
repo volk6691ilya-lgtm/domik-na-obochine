@@ -187,6 +187,15 @@ class TAEngine:
             except Exception:
                 fib_levels = {}
                 fib_status = "Фибоначчи недоступен"
+
+            # 🔍 ВРЕМЕННОЕ ЛОГИРОВАНИЕ ДЛЯ ПРОВЕРКИ (Удалить после тестов)
+            logging.info(f"🔍 ПРОВЕРКА ИНДИКАТОРОВ для {df.index[-1]}:")
+            logging.info(f"   📊 Bollinger Bands: Верх={boll_upper:.2f}, Сред={boll_middle:.2f}, Низ={boll_lower:.2f}")
+            logging.info(f"   📊 {boll_status}")
+            logging.info(f"   📊 Williams %R: WR14={wr14:.2f}, WR21={wr21:.2f}")
+            logging.info(f"   📊 {wr_status}")
+            logging.info(f"   📊 Фибоначчи: 0.0={fib_levels.get('0.0')}, 0.618={fib_levels.get('0.618')}, 1.0={fib_levels.get('1.0')}, 1.618={fib_levels.get('1.618')}")
+            logging.info(f"   📊 {fib_status}")
             
             return {
                 "price": round(current_price, 4),
