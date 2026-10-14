@@ -210,25 +210,35 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     except:
         rr_value = "N/A"
     
+    # Определяем направление
     is_long = "Бычий" in ta_data['trend']
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
-    direction_emoji = "🟢" if is_long else "🔴"
+    direction_emoji = "" if is_long else "🔴"
     
+    # Рассчитываем TP1, TP2, TP3
     entry = ta_data['entry']
     sl = ta_data['sl']
     tp = ta_data['tp']
     
     if is_long:
-        tp1 = round(entry + (tp - entry) * 0.4, 4)
-        tp2 = round(entry + (tp - entry) * 0.7, 4)
-        tp3 = tp
+        tp1 = round(entry + (tp - entry) * 0.4, 4)  # 40% движения
+        tp2 = round(entry + (tp - entry) * 0.7, 4)  # 70% движения
+        tp3 = tp   # 100% движения
     else:
         tp1 = round(entry - (entry - tp) * 0.4, 4)
         tp2 = round(entry - (entry - tp) * 0.7, 4)
         tp3 = tp
     
+    # 🔧 ИСПРАВЛЕНИЕ: Динамический текст для SL
+    if sl > entry:
+        sl_text = "вырастет выше"
+    else:
+        sl_text = "упадет ниже"
+    
+    # Рекомендуемое плечо (безопасное для новичков)
     leverage = "3x-5x" if quality_level == "high" else "2x-3x"
     
+    # Обоснование с учетом паттерна
     pattern_text = ', '.join(pattern_data['patterns'])
     has_bullish_pattern = any('Бычий' in p for p in pattern_data['patterns'])
     
@@ -244,13 +254,15 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         justification = "Движение не подтверждено объемом — повышенный риск манипуляций."
     
+    # Рекомендация
     if quality_level == "high":
         rec = "✅ Сигнал соответствует всем критериям. Можно рассматривать вход."
     elif quality_level == "medium":
-        rec = "️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
+        rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
     else:
         rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
+    # Формируем пост (исправленный)
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
  **КАЧЕСТВО СИГНАЛА:** {quality_desc}
@@ -258,7 +270,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
 • 🔵 **Точка входа (Entry):** ${entry}
-• 🟢 **Стоп-лосс (SL):** ${sl} *(если цена упадет ниже — выходим)*
+• 🟢 **Стоп-лосс (SL):** ${sl} *(если цена {sl_text} — выходим)*
 • 🔴 **Цели прибыли (TP):**
   - TP1: ${tp1} *(фиксация 40% прибыли)*
   - TP2: ${tp2} *(фиксация 70% прибыли)*
@@ -270,7 +282,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Глобальный режим: {macro_regime}
 {macro_warning if macro_warning else '• Макро-событий в ближайшие 24 часа не ожидается'}
 
-📉 **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
+ **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
 • Тренд: {ta_data['trend']}
 • Импульс: {ta_data['momentum']}
 • MACD: {ta_data['macd']}
@@ -290,8 +302,8 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Обязательно используйте Stop Loss
 • Соотношение риск/прибыль должно быть ≥ 1:2 (текущее: 1:{rr_value})
 
- **ДИСКЛЕЙМЕР:**
-️ Не является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с риском потери средств. Проводите собственное исследование (DYOR)."""
+📜 **ДИСКЛЕЙМЕР:**
+⚠️ Не является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с риском потери средств. Проводите собственное исследование (DYOR)."""
 
     return post
 
