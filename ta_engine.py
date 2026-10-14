@@ -42,7 +42,7 @@ class TAEngine:
                 
                 momentum = "Нейтрально"
                 if rsi < 35 and stoch_k < 20:
-                    momentum = "Перепроданность (Потенциальный отскок вверх) "
+                    momentum = "Перепроданность (Потенциальный отскок вверх) 🟢"
                 elif rsi > 65 and stoch_k > 80:
                     momentum = "Перекупленность (Риск коррекции вниз) 🔴"
             except Exception:
@@ -89,7 +89,7 @@ class TAEngine:
             except Exception:
                 atr = (float(df['high'].iloc[-1]) - float(df['low'].iloc[-1])) * 1.5
 
-                        # 6. WILLIAMS %R (НОВОЕ! Шаг 3)
+            # 6. WILLIAMS %R
             try:
                 wr_indicator1 = ta.momentum.WilliamsRIndicator(
                     high=df['high'], low=df['low'], close=df['close'], lbp=self.wr_period1
@@ -101,7 +101,6 @@ class TAEngine:
                 )
                 wr21 = float(wr_indicator2.williams_r().iloc[-1])
                 
-                # Определяем статус
                 if wr14 < -80 and wr21 < -80:
                     wr_status = "Оба WR в перепроданности (сильный сигнал на покупку) 🟢"
                 elif wr14 > -20 and wr21 > -20:
@@ -145,7 +144,7 @@ class TAEngine:
 
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
-            # 8. BOLLINGER BANDS (НОВОЕ! Шаг 2)
+            # 8. BOLLINGER BANDS
             try:
                 bollinger = ta.volatility.BollingerBands(
                     close=df['close'], window=20, window_dev=2
@@ -154,7 +153,6 @@ class TAEngine:
                 boll_middle = float(bollinger.bollinger_mavg().iloc[-1])
                 boll_lower = float(bollinger.bollinger_lband().iloc[-1])
                 
-                # Определяем положение цены
                 if current_price <= boll_lower:
                     boll_status = "У нижней полосы (перепроданность) 🟢"
                 elif current_price >= boll_upper:
@@ -165,7 +163,7 @@ class TAEngine:
                 boll_upper, boll_middle, boll_lower = 0, 0, 0
                 boll_status = "Недоступно ⚪"
             
-            # 9. УРОВНИ ФИБОНАЧЧИ (НОВОЕ! Шаг 1)
+            # 9. УРОВНИ ФИБОНАЧЧИ
             try:
                 recent_high = float(df['high'].iloc[-48:].max())
                 recent_low = float(df['low'].iloc[-48:].min())
@@ -176,27 +174,18 @@ class TAEngine:
                     '0.236': round(recent_low + diff * 0.236, 4),
                     '0.382': round(recent_low + diff * 0.382, 4),
                     '0.5': round(recent_low + diff * 0.5, 4),
-                    '0.618': round(recent_low + diff * 0.618, 4),  # Золотое сечение
+                    '0.618': round(recent_low + diff * 0.618, 4),
                     '0.786': round(recent_low + diff * 0.786, 4),
                     '1.0': round(recent_high, 4),
-                    '1.618': round(recent_low + diff * 1.618, 4),  # Расширение
+                    '1.618': round(recent_low + diff * 1.618, 4),
                     '2.618': round(recent_low + diff * 2.618, 4)
                 }
-                
                 fib_status = f"Диапазон: ${fib_levels['0.0']} - ${fib_levels['1.0']}"
             except Exception:
                 fib_levels = {}
                 fib_status = "Фибоначчи недоступен"
-
-            # 🔍 ВРЕМЕННОЕ ЛОГИРОВАНИЕ ДЛЯ ПРОВЕРКИ (Удалить после тестов)
-            logging.info(f"🔍 ПРОВЕРКА ИНДИКАТОРОВ для {df.index[-1]}:")
-            logging.info(f"   📊 Bollinger Bands: Верх={boll_upper:.2f}, Сред={boll_middle:.2f}, Низ={boll_lower:.2f}")
-            logging.info(f"   📊 {boll_status}")
-            logging.info(f"   📊 Williams %R: WR14={wr14:.2f}, WR21={wr21:.2f}")
-            logging.info(f"   📊 {wr_status}")
-            logging.info(f"   📊 Фибоначчи: 0.0={fib_levels.get('0.0')}, 0.618={fib_levels.get('0.618')}, 1.0={fib_levels.get('1.0')}, 1.618={fib_levels.get('1.618')}")
-            logging.info(f"   📊 {fib_status}")
             
+            # ЧИСТЫЙ ВОЗВРАТ ДАННЫХ (временное логирование удалено)
             return {
                 "price": round(current_price, 4),
                 "entry": round(entry_level, 4),
@@ -210,15 +199,12 @@ class TAEngine:
                 "rsi": round(rsi, 2),
                 "stoch_k": round(stoch_k, 2),
                 "atr": round(atr, 4),
-                # Bollinger Bands (Шаг 2)
                 "boll_upper": round(boll_upper, 4),
                 "boll_middle": round(boll_middle, 4),
                 "boll_lower": round(boll_lower, 4),
                 "boll_status": boll_status,
-                # 👇 ДОБАВЛЕНО: Уровни Фибоначчи (Шаг 1 завершен)
                 "fib_levels": fib_levels,
                 "fib_status": fib_status,
-                # Williams %R (Шаг 3) 👇 ДОБАВЛЕНО
                 "wr14": round(wr14, 2),
                 "wr21": round(wr21, 2),
                 "wr_status": wr_status
