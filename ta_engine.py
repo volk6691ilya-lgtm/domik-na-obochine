@@ -13,9 +13,6 @@ class TAEngine:
         self.macd_slow = 26
         self.macd_signal = 9
         self.stoch_rsi_length = 14
-        self.boll_period = 20  # НОВОЕ: Bollinger Bands
-        self.wr_period1 = 14   # НОВОЕ: Williams %R короткий
-        self.wr_period2 = 21   # НОВОЕ: Williams %R длинный
 
     def analyze(self, df: pd.DataFrame) -> dict:
         try:
@@ -40,7 +37,6 @@ class TAEngine:
                     close=df['close'], window=self.stoch_rsi_length, smooth1=3, smooth2=3
                 )
                 stoch_k = float(stoch_rsi_indicator.stochrsi_k().iloc[-1])
-                stoch_d = float(stoch_rsi_indicator.stochrsi_d().iloc[-1])
                 
                 momentum = "Нейтрально"
                 if rsi < 35 and stoch_k < 20:
@@ -48,7 +44,7 @@ class TAEngine:
                 elif rsi > 65 and stoch_k > 80:
                     momentum = "Перекупленность (Риск коррекции вниз) 🔴"
             except Exception:
-                rsi, stoch_k, stoch_d = 50.0, 50.0, 50.0
+                rsi, stoch_k = 50.0, 50.0
                 momentum = "Нейтрально ⚪ (RSI недоступен)"
 
             # 3. MACD
@@ -62,54 +58,7 @@ class TAEngine:
             except Exception:
                 macd_signal_text = "Нейтрально ⚪ (MACD недоступен)"
 
-            # 4. BOLLINGER BANDS (НОВОЕ!)
-            try:
-                bollinger = ta.volatility.BollingerBands(
-                    close=df['close'], window=self.boll_period, window_dev=2
-                )
-                boll_upper = float(bollinger.bollinger_hband().iloc[-1])
-                boll_middle = float(bollinger.bollinger_mavg().iloc[-1])
-                boll_lower = float(bollinger.bollinger_lband().iloc[-1])
-                
-                # Определяем положение цены относительно полос
-                if current_price <= boll_lower:
-                    boll_status = "У нижней полосы (перепроданность) 🟢"
-                elif current_price >= boll_upper:
-                    boll_status = "У верхней полосы (перекупленность) 🔴"
-                else:
-                    boll_status = "Внутри полос (нейтрально) ⚪"
-            except Exception:
-                boll_upper, boll_middle, boll_lower = 0, 0, 0
-                boll_status = "Недоступно ⚪"
-
-            # 5. WILLIAMS %R (НОВОЕ!)
-            try:
-                wr_indicator1 = ta.momentum.WilliamsRIndicator(
-                    high=df['high'], low=df['low'], close=df['close'], lbp=self.wr_period1
-                )
-                wr14 = float(wr_indicator1.williams_r().iloc[-1])
-                
-                wr_indicator2 = ta.momentum.WilliamsRIndicator(
-                    high=df['high'], low=df['low'], close=df['close'], lbp=self.wr_period2
-                )
-                wr21 = float(wr_indicator2.williams_r().iloc[-1])
-                
-                # Определяем статус
-                if wr14 < -80 and wr21 < -80:
-                    wr_status = "Оба WR в перепроданности (сильный сигнал на покупку) 🟢"
-                elif wr14 > -20 and wr21 > -20:
-                    wr_status = "Оба WR в перекупленности (сигнал на продажу) "
-                elif wr14 < -80:
-                    wr_status = "WR14 в перепроданности (потенциальный отскок) 🟢"
-                elif wr21 < -80:
-                    wr_status = "WR21 в перепроданности (потенциальный отскок) 🟡"
-                else:
-                    wr_status = "WR в нейтральной зоне ⚪"
-            except Exception:
-                wr14, wr21 = -50.0, -50.0
-                wr_status = "Недоступно ⚪"
-
-            # 6. PVT (Price Volume Trend)
+            # 4. PVT (Price Volume Trend)
             try:
                 price_change = df['close'].pct_change()
                 pvt_series = (price_change * df['volume']).cumsum()
@@ -127,9 +76,9 @@ class TAEngine:
                 else:
                     volume_confirmed = "Нет ⚠️ (Дивергенция! Движение не подтверждено объемом)"
             except Exception:
-                volume_confirmed = "Недоступно ️ (PVT не рассчитан)"
+                volume_confirmed = "Недоступно ⚠️ (PVT не рассчитан)"
 
-            # 7. ATR (Average True Range) для расчета Stop Loss
+            # 5. ATR (Average True Range) для расчета Stop Loss
             try:
                 atr_indicator = ta.volatility.AverageTrueRange(
                     high=df['high'], low=df['low'], close=df['close'], window=14
@@ -138,30 +87,7 @@ class TAEngine:
             except Exception:
                 atr = (float(df['high'].iloc[-1]) - float(df['low'].iloc[-1])) * 1.5
 
-            # 8. УРОВНИ ФИБОНАЧЧИ (НОВОЕ!)
-            try:
-                recent_high = float(df['high'].iloc[-48:].max())
-                recent_low = float(df['low'].iloc[-48:].min())
-                diff = recent_high - recent_low
-                
-                fib_levels = {
-                    '0.0': round(recent_low, 4),
-                    '0.236': round(recent_low + diff * 0.236, 4),
-                    '0.382': round(recent_low + diff * 0.382, 4),
-                    '0.5': round(recent_low + diff * 0.5, 4),
-                    '0.618': round(recent_low + diff * 0.618, 4),
-                    '0.786': round(recent_low + diff * 0.786, 4),
-                    '1.0': round(recent_high, 4),
-                    '1.618': round(recent_low + diff * 1.618, 4),
-                    '2.618': round(recent_low + diff * 2.618, 4)
-                }
-                
-                fib_status = f"Ближайший уровень: 0.618 (${fib_levels['0.618']})"
-            except Exception:
-                fib_levels = {}
-                fib_status = "Фибоначчи недоступен"
-
-            # 9. УРОВНИ SL/TP (С УЧЕТОМ ФИБОНАЧЧИ)
+            # 6. УРОВНИ SL/TP
             recent_lows = float(df['low'].iloc[-48:].min())
             recent_highs = float(df['high'].iloc[-48:].max())
             
@@ -202,20 +128,7 @@ class TAEngine:
                 "estimated_R:R": f"1 : {rr_ratio} ({rr_status})",
                 "rsi": round(rsi, 2),
                 "stoch_k": round(stoch_k, 2),
-                "stoch_d": round(stoch_d, 2),
-                "atr": round(atr, 4),
-                # НОВОЕ: Bollinger Bands
-                "boll_upper": round(boll_upper, 4),
-                "boll_middle": round(boll_middle, 4),
-                "boll_lower": round(boll_lower, 4),
-                "boll_status": boll_status,
-                # НОВОЕ: Williams %R
-                "wr14": round(wr14, 2),
-                "wr21": round(wr21, 2),
-                "wr_status": wr_status,
-                # НОВОЕ: Уровни Фибоначчи
-                "fib_levels": fib_levels,
-                "fib_status": fib_status
+                "atr": round(atr, 4)
             }
 
         except Exception as e:
