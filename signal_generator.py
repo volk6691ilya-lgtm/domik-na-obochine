@@ -13,7 +13,6 @@ from macro_calendar import MacroCalendar
 from ta_engine import TAEngine
 from pattern_recognition import PatternRecognizer
 from visualizer import ChartVisualizer
-from ai_models_config import get_models_for_task
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -157,7 +156,7 @@ def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
             logging.info(f"✅ {symbol}: Успешно получено {len(df)} свечей (1H) через Yahoo Finance!")
             return df
     except Exception as e:
-        logging.error(f" {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
+        logging.error(f"❌ {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data(symbol: str) -> pd.DataFrame:
@@ -193,13 +192,15 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
-    # 🧪 ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Снижаем пороги, чтобы увидеть работу системы
+    # 🔒 ПОРОГИ ПОВЫШЕНЫ на +0.4 от тестовых значений для большей безопасности
     if rr_value >= 1.3 and volume_confirmed:
-        return ("high", "", "Высоковероятный сигнал")
-    elif rr_value >= 0.5:  # СНИЖЕНО с 1.0 до 0.5 ДЛЯ ТЕСТА
-        return ("medium", "🟡", "Средняя вероятность (ТЕСТОВЫЙ ЗАПУСК)")
+        return ("high", "🟢", "Высоковероятный сигнал")
+    elif rr_value >= 0.9 and volume_confirmed:  # Было 0.5, стало 0.9
+        return ("medium", "🟡", "Средняя вероятность")
+    elif rr_value >= 1.3 and not volume_confirmed:
+        return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else:
-        return ("low", "", "Низкая вероятность (ТЕСТОВЫЙ ЗАПУСК)")
+        return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
     coin_name = symbol.replace('USDT', '')
@@ -209,12 +210,11 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     except:
         rr_value = "N/A"
     
-    # Определяем направление
     is_long = "Бычий" in ta_data['trend']
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
     direction_emoji = "🟢" if is_long else "🔴"
     
-    # ✅ ИСПОЛЬЗОВАНИЕ УРОВНЕЙ ФИБОНАЧЧИ ДЛЯ ЦЕЛЕЙ (ШАГ 4)
+    # ✅ ИСПОЛЬЗОВАНИЕ УРОВНЕЙ ФИБОНАЧЧИ ДЛЯ ЦЕЛЕЙ
     entry = ta_data['entry']
     sl = ta_data['sl']
     tp = ta_data['tp']
@@ -229,16 +229,14 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         tp2 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.7, 4))
         tp3 = fib_levels.get('0.0', tp)
     
-    # 🔧 ИСПРАВЛЕНИЕ: Динамический текст для STOP-LOSS
+    # 🔧 ДИНАМИЧЕСКИЙ ТЕКСТ ДЛЯ STOP-LOSS
     if sl > entry:
         sl_text = "вырастет выше"
     else:
         sl_text = "упадет ниже"
     
-    # Рекомендуемое плечо (безопасное для новичков)
     leverage = "3x-5x" if quality_level == "high" else "2x-3x"
     
-    # Обоснование с учетом паттерна
     pattern_text = ', '.join(pattern_data['patterns'])
     has_bullish_pattern = any('Бычий' in p for p in pattern_data['patterns'])
     
@@ -254,15 +252,13 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         justification = "Движение не подтверждено объемом — повышенный риск манипуляций."
     
-    # Рекомендация
     if quality_level == "high":
         rec = "✅ Сигнал соответствует всем критериям. Можно рассматривать вход."
     elif quality_level == "medium":
         rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
     else:
-        rec = " Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
+        rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
-    # Формируем пост
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
@@ -271,7 +267,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Направление: {direction_emoji} **{direction}**
 • 🔵 **Точка входа (Entry):** ${entry}
 • 🟢 **Стоп-лосс (SL):** ${sl} *(если цена {sl_text} — выходим)*
-•  **Цели прибыли (TP):**
+• 🔴 **Цели прибыли (TP):**
   - TP1: ${tp1} *(фиксация 40% прибыли)*
   - TP2: ${tp2} *(фиксация 70% прибыли)*
   - TP3: ${tp3} *(полная цель)*
@@ -295,7 +291,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 📋 **РЕКОМЕНДАЦИЯ:**
 {rec}
 
-️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
+⏱️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
 
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
@@ -420,10 +416,10 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
-        # 🧪 ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Отключаем жесткую фильтрацию
-        # if quality_level == "low":
-        #     logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
-        #     continue
+        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: не отправляем сигналы низкого качества
+        if quality_level == "low":
+            logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
+            continue
         
         try:
             rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
@@ -433,8 +429,8 @@ def main():
         except:
             rr_value = 0.0
         
-        #  ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Снижаем порог R:R с 1.0 до 0.3
-        if rr_value < 0.3:
+        # 🔒 ПОРОГ ОТСЕЧЕНИЯ ПОВЫШЕН с 0.3 до 0.7 (+0.4)
+        if rr_value < 0.7:
             logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
@@ -450,7 +446,7 @@ def main():
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
             return
         
         logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
@@ -459,7 +455,7 @@ def main():
             post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
             send_to_telegram(post_text, chart_path, best_coin['symbol'])
     else:
-        logging.info("✅ Рынок во флэте. Ни одна монета не прошла строгий фильтр качества. Сигналы не отправлены (капитал защищен).")
+        logging.info("✅ Рынок во флэте или нет подходящих setups. Ни одна монета не прошла строгий фильтр качества. Сигналы не отправлены (капитал защищен).")
 
 if __name__ == "__main__":
     main()
