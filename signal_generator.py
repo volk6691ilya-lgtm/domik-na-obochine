@@ -193,14 +193,13 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
+    # 🧪 ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Снижаем пороги, чтобы увидеть работу системы
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 1.0 and volume_confirmed:
-        return ("medium", "🟡", "Средняя вероятность")
-    elif rr_value >= 1.3 and not volume_confirmed:
-        return ("medium", "", "Хороший R:R, но объем не подтвержден")
+    elif rr_value >= 0.5:  # СНИЖЕНО с 1.0 до 0.5 ДЛЯ ТЕСТА
+        return ("medium", "🟡", "Средняя вероятность (ТЕСТОВЫЙ ЗАПУСК)")
     else:
-        return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
+        return ("low", "⚪", "Низкая вероятность (ТЕСТОВЫЙ ЗАПУСК)")
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
     coin_name = symbol.replace('USDT', '')
@@ -423,10 +422,10 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
-        # ЖЕСТКАЯ ФИЛЬТРАЦИЯ: не отправляем сигналы низкого качества
-        if quality_level == "low":
-            logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
-            continue
+        # 🧪 ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Отключаем жесткую фильтрацию
+        # if quality_level == "low":
+        #     logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
+        #     continue
         
         try:
             rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
@@ -436,9 +435,9 @@ def main():
         except:
             rr_value = 0.0
         
-        # ЖЕСТКАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 1.0
-        if rr_value < 1.0:
-            logging.info(f"⏸️ {coin}: R:R < 1.0 ({rr_value}). Пропускаем.")
+        # 🧪 ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Снижаем порог R:R с 1.0 до 0.3
+        if rr_value < 0.3:
+            logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
         score = rr_value + (0.5 if "Да ✅" in ta_data['volume_confirmed'] else 0)
