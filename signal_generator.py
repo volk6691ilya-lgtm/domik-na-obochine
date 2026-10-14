@@ -193,11 +193,21 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
-    if rr_value >= 1.3 and volume_confirmed:
-        return ("high", "🟢", "Высоковероятный сигнал")
+    # НОВОЕ: Проверка Williams %R
+    wr14 = ta_data.get('wr14', -50)
+    wr21 = ta_data.get('wr21', -50)
+    wr_oversold = wr14 < -80 and wr21 < -80
+    
+    # ПОНИЖЕННЫЕ ПОРОГИ для достижения TP3
+    if rr_value >= 1.1 and volume_confirmed and wr_oversold:
+        return ("high", "🟢", "Высоковероятный сигнал (WR подтверждает)")
+    elif rr_value >= 1.1 and volume_confirmed:
+        return ("high", "", "Высоковероятный сигнал")
     elif rr_value >= 1.0 and volume_confirmed:
-        return ("medium", "🟡", "Средняя вероятность")
-    elif rr_value >= 1.3 and not volume_confirmed:
+        return ("medium", "", "Средняя вероятность")
+    elif rr_value >= 1.1 and wr_oversold:
+        return ("medium", "🟡", "Хороший R:R + WR перепроданность")
+    elif rr_value >= 1.0 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else:
         return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
@@ -295,7 +305,8 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 
     return post
 
-def send_to_telegram(text: str, chart_path: str, symbol: str):
+def send_to_telegram(text: str, chart_paths: list, symbol: str):
+    """Отправляет сигнал в Telegram: несколько картинок, потом полный текст"""
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
@@ -303,35 +314,45 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
         logging.error("❌ Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
         return
 
-    try:
-        with open(chart_path, 'rb') as f:
-            coin_name = symbol.replace('USDT', '')
-            short_caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n"
-            short_caption += f"🎯 Точка входа + SL/TP\n\n"
-            short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
-            
-            files = {
-                'photo': ('signal_chart.png', f, 'image/png'),
-                'chat_id': (None, channel_id),
-                'caption': (None, short_caption),
-                'parse_mode': (None, 'Markdown')
-            }
-            response = requests.post(
-                f"https://api.telegram.org/bot{bot_token}/sendPhoto",
-                files=files,
-                timeout=30
-            )
-            
-        if response.status_code == 200:
-            logging.info("✅ Картинка успешно отправлена в Telegram!")
-        else:
-            logging.error(f"❌ Ошибка отправки картинки: {response.text}")
-            
-        time.sleep(2)
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка отправки картинки: {e}")
+    # Отправляем все картинки по очереди
+    for i, chart_path in enumerate(chart_paths):
+        try:
+            with open(chart_path, 'rb') as f:
+                coin_name = symbol.replace('USDT', '')
+                
+                if i == 0:
+                    caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n🎯 Точка входа + SL/TP\n\n👇 *Осцилляторы ниже*"
+                elif i == 1:
+                    caption = f"📈 **MACD** — импульс тренда"
+                elif i == 2:
+                    caption = f"📉 **RSI + StochRSI** — перекупленность/перепроданность"
+                elif i == 3:
+                    caption = f" **Williams %R** — подтверждение разворота"
+                
+                files = {
+                    'photo': (f'chart_{i}.png', f, 'image/png'),
+                    'chat_id': (None, channel_id),
+                    'caption': (None, caption),
+                    'parse_mode': (None, 'Markdown')
+                }
+                
+                response = requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+                    files=files,
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    logging.info(f"✅ Картинка {i+1}/{len(chart_paths)} отправлена!")
+                else:
+                    logging.error(f"❌ Ошибка отправки картинки {i+1}: {response.text}")
+                
+                time.sleep(1)
+                
+        except Exception as e:
+            logging.error(f"❌ Ошибка отправки картинки {i+1}: {e}")
     
+    # Отправляем полный текст
     try:
         max_length = 4000
         parts = []
