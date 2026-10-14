@@ -116,6 +116,29 @@ class TAEngine:
 
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
+                        # 7. УРОВНИ ФИБОНАЧЧИ (НОВОЕ! Шаг 1)
+            try:
+                recent_high = float(df['high'].iloc[-48:].max())
+                recent_low = float(df['low'].iloc[-48:].min())
+                diff = recent_high - recent_low
+                
+                fib_levels = {
+                    '0.0': round(recent_low, 4),
+                    '0.236': round(recent_low + diff * 0.236, 4),
+                    '0.382': round(recent_low + diff * 0.382, 4),
+                    '0.5': round(recent_low + diff * 0.5, 4),
+                    '0.618': round(recent_low + diff * 0.618, 4),  # Золотое сечение
+                    '0.786': round(recent_low + diff * 0.786, 4),
+                    '1.0': round(recent_high, 4),
+                    '1.618': round(recent_low + diff * 1.618, 4),  # Расширение
+                    '2.618': round(recent_low + diff * 2.618, 4)
+                }
+                
+                fib_status = f"Диапазон: ${fib_levels['0.0']} - ${fib_levels['1.0']}"
+            except Exception:
+                fib_levels = {}
+                fib_status = "Фибоначчи недоступен"
+            
             return {
                 "price": round(current_price, 4),
                 "entry": round(entry_level, 4),
@@ -129,6 +152,9 @@ class TAEngine:
                 "rsi": round(rsi, 2),
                 "stoch_k": round(stoch_k, 2),
                 "atr": round(atr, 4)
+                # 👇 ДОБАВЛЕНО: Уровни Фибоначчи (Шаг 1 завершен)
+                "fib_levels": fib_levels,
+                "fib_status": fib_status
             }
 
         except Exception as e:
