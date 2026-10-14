@@ -112,7 +112,7 @@ def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
                     logging.info(f"✅ {symbol}: Получено {len(df)} свечей (1H) через Bybit")
                     return df
     except Exception as e:
-        logging.warning(f"️ {symbol}: Bybit ошибка - {str(e)[:50]}")
+        logging.warning(f"⚠️ {symbol}: Bybit ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
@@ -135,7 +135,7 @@ def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
                 logging.info(f"✅ {symbol}: Получено через CoinGecko (1H)")
                 return df
     except Exception as e:
-        logging.warning(f"️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
+        logging.warning(f"⚠️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
@@ -157,7 +157,7 @@ def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
             logging.info(f"✅ {symbol}: Успешно получено {len(df)} свечей (1H) через Yahoo Finance!")
             return df
     except Exception as e:
-        logging.error(f"❌ {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
+        logging.error(f" {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data(symbol: str) -> pd.DataFrame:
@@ -195,11 +195,11 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     
     # 🧪 ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Снижаем пороги, чтобы увидеть работу системы
     if rr_value >= 1.3 and volume_confirmed:
-        return ("high", "🟢", "Высоковероятный сигнал")
+        return ("high", "", "Высоковероятный сигнал")
     elif rr_value >= 0.5:  # СНИЖЕНО с 1.0 до 0.5 ДЛЯ ТЕСТА
         return ("medium", "🟡", "Средняя вероятность (ТЕСТОВЫЙ ЗАПУСК)")
     else:
-        return ("low", "⚪", "Низкая вероятность (ТЕСТОВЫЙ ЗАПУСК)")
+        return ("low", "", "Низкая вероятность (ТЕСТОВЫЙ ЗАПУСК)")
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
     coin_name = symbol.replace('USDT', '')
@@ -212,26 +212,24 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     # Определяем направление
     is_long = "Бычий" in ta_data['trend']
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
-    direction_emoji = "" if is_long else "🔴"
+    direction_emoji = "🟢" if is_long else "🔴"
     
-     # Рассчитываем TP1, TP2, TP3 на основе уровней Фибоначчи (Шаг 4)
+    # ✅ ИСПОЛЬЗОВАНИЕ УРОВНЕЙ ФИБОНАЧЧИ ДЛЯ ЦЕЛЕЙ (ШАГ 4)
     entry = ta_data['entry']
     sl = ta_data['sl']
     tp = ta_data['tp']
-    fib_levels = ta_data.get('fib_levels', {}) # Берем уровни из TA Engine
+    fib_levels = ta_data.get('fib_levels', {})
     
     if is_long:
-        # Для лонга цели выше: 61.8% (золотое сечение), 100% (максимум), 161.8% (расширение)
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
         tp3 = fib_levels.get('1.618', tp)
     else:
-        # Для шорта цели ниже: 61.8% (ближайшая поддержка), 38.2% (глубокий откат), 0.0% (минимум диапазона)
         tp1 = fib_levels.get('0.618', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.7, 4))
         tp3 = fib_levels.get('0.0', tp)
     
-    # 🔧 ИСПРАВЛЕНИЕ: Динамический текст для SL
+    # 🔧 ИСПРАВЛЕНИЕ: Динамический текст для STOP-LOSS
     if sl > entry:
         sl_text = "вырастет выше"
     else:
@@ -262,18 +260,18 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     elif quality_level == "medium":
         rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
     else:
-        rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
+        rec = " Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
-    # Формируем пост (исправленный)
+    # Формируем пост
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
- **КАЧЕСТВО СИГНАЛА:** {quality_desc}
+📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
 
 🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
 • 🔵 **Точка входа (Entry):** ${entry}
 • 🟢 **Стоп-лосс (SL):** ${sl} *(если цена {sl_text} — выходим)*
-• 🔴 **Цели прибыли (TP):**
+•  **Цели прибыли (TP):**
   - TP1: ${tp1} *(фиксация 40% прибыли)*
   - TP2: ${tp2} *(фиксация 70% прибыли)*
   - TP3: ${tp3} *(полная цель)*
@@ -284,7 +282,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Глобальный режим: {macro_regime}
 {macro_warning if macro_warning else '• Макро-событий в ближайшие 24 часа не ожидается'}
 
- **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
+📉 **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
 • Тренд: {ta_data['trend']}
 • Импульс: {ta_data['momentum']}
 • MACD: {ta_data['macd']}
@@ -297,7 +295,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 📋 **РЕКОМЕНДАЦИЯ:**
 {rec}
 
-⏱️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
+️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
 
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
@@ -435,7 +433,7 @@ def main():
         except:
             rr_value = 0.0
         
-        # 🧪 ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Снижаем порог R:R с 1.0 до 0.3
+        #  ВРЕМЕННЫЙ ТЕСТОВЫЙ РЕЖИМ: Снижаем порог R:R с 1.0 до 0.3
         if rr_value < 0.3:
             logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
@@ -452,10 +450,10 @@ def main():
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            logging.info(f"️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
             return
         
-        logging.info(f" Лучшая: {best_coin['symbol']}")
+        logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
         chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"signal_{best_coin['symbol']}.png")
         if chart_path:
             post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
