@@ -215,19 +215,22 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
     direction_emoji = "" if is_long else "🔴"
     
-    # Рассчитываем TP1, TP2, TP3
+     # Рассчитываем TP1, TP2, TP3 на основе уровней Фибоначчи (Шаг 4)
     entry = ta_data['entry']
     sl = ta_data['sl']
     tp = ta_data['tp']
+    fib_levels = ta_data.get('fib_levels', {}) # Берем уровни из TA Engine
     
     if is_long:
-        tp1 = round(entry + (tp - entry) * 0.4, 4)  # 40% движения
-        tp2 = round(entry + (tp - entry) * 0.7, 4)  # 70% движения
-        tp3 = tp   # 100% движения
+        # Для лонга цели выше: 61.8% (золотое сечение), 100% (максимум), 161.8% (расширение)
+        tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
+        tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
+        tp3 = fib_levels.get('1.618', tp)
     else:
-        tp1 = round(entry - (entry - tp) * 0.4, 4)
-        tp2 = round(entry - (entry - tp) * 0.7, 4)
-        tp3 = tp
+        # Для шорта цели ниже: 61.8% (ближайшая поддержка), 38.2% (глубокий откат), 0.0% (минимум диапазона)
+        tp1 = fib_levels.get('0.618', round(entry - (entry - tp) * 0.4, 4))
+        tp2 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.7, 4))
+        tp3 = fib_levels.get('0.0', tp)
     
     # 🔧 ИСПРАВЛЕНИЕ: Динамический текст для SL
     if sl > entry:
