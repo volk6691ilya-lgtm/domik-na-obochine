@@ -104,6 +104,21 @@ class ChartVisualizer:
                 hlines_colors.append('red')
                 hlines_styles.append('--')
 
+            # 6. BOLLINGER BANDS (НОВОЕ! Шаг 5: Визуализация)
+            if 'boll_upper' in ta_data and 'boll_middle' in ta_data and 'boll_lower' in ta_data:
+                # Верхняя полоса
+                hlines.append(float(ta_data['boll_upper']))
+                hlines_colors.append('gray')
+                hlines_styles.append('-.')
+                # Средняя линия (SMA 20)
+                hlines.append(float(ta_data['boll_middle']))
+                hlines_colors.append('gray')
+                hlines_styles.append('--')
+                # Нижняя полоса
+                hlines.append(float(ta_data['boll_lower']))
+                hlines_colors.append('gray')
+                hlines_styles.append('-.')
+
             # Настройки стиля графика (похож на TradingView)
             mc = mpf.make_marketcolors(up='g', down='r', edge='i', wick='i', volume='in', inherit=True)
             s = mpf.make_mpf_style(marketcolors=mc, base_mpf_style='charles')
@@ -136,10 +151,10 @@ class ChartVisualizer:
 
 # Блок для локального тестирования
 if __name__ == "__main__":
-    print("\n--- Тест Chart Visualizer (с Фибоначчи) ---")
+    print("\n--- Тест Chart Visualizer (с Фибоначчи и Bollinger Bands) ---")
 
     np.random.seed(42)
-    dates = pd.date_range(end='2026-09-28', periods=50, freq='1h')
+    dates = pd.date_range(end='2026-10-14', periods=50, freq='1h')
     closes = np.cumsum(np.random.randn(50)) + 100
     opens = closes + np.random.randn(50) * 0.5
     highs = np.maximum(opens, closes) + np.random.rand(50) * 1.0
@@ -150,7 +165,7 @@ if __name__ == "__main__":
         'open': opens, 'high': highs, 'low': lows, 'close': closes, 'volume': volumes
     }, index=dates)
 
-    # Тестовые данные с Фибоначчи (как в реальном ta_engine.py)
+    # Тестовые данные с Фибоначчи и Bollinger Bands (как в реальном ta_engine.py)
     mock_ta_data = {
         "price": 98.50,
         "entry": 98.00,
@@ -163,7 +178,10 @@ if __name__ == "__main__":
             '0.618': 102.37,  # TP1
             '1.0': 105.00,    # TP2
             '1.618': 109.58   # TP3
-        }
+        },
+        "boll_upper": 103.50,
+        "boll_middle": 98.50,
+        "boll_lower": 93.50
     }
 
     visualizer = ChartVisualizer()
@@ -171,13 +189,12 @@ if __name__ == "__main__":
 
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
-        print("👉 На графике 5 линий (теперь по Фибоначчи):")
+        print("👉 На графике теперь 8 линий:")
         print("   🟢 SL (зелёный пунктир): $95.00")
         print("   🔵 Entry (синяя сплошная): $98.00")
-        print("   🟠 TP1 (оранжевый пунктир): $102.37 (0.618)")
-        print("   🟠 TP2 (оранжево-красный пунктир): $105.00 (1.0)")
-        print("    TP3 (красный пунктир): $109.58 (1.618)")
-        print("\n💡 Теперь TP на графике и в тексте будут СОВПАДАТЬ!")
+        print("   🟠 TP1, TP2, TP3 (оранжевые/красные)")
+        print("   ⚪ Bollinger Bands: Верх, Сред, Низ (серые пунктирные)")
+        print("\n💡 Теперь TP на графике и в тексте совпадают, а Bollinger Bands добавлены для контекста!")
     else:
         print("\n❌ Ошибка при создании графика.")
 
