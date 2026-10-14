@@ -112,7 +112,7 @@ def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
                     logging.info(f"✅ {symbol}: Получено {len(df)} свечей (1H) через Bybit")
                     return df
     except Exception as e:
-        logging.warning(f"⚠️ {symbol}: Bybit ошибка - {str(e)[:50]}")
+        logging.warning(f"️ {symbol}: Bybit ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
@@ -135,7 +135,7 @@ def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
                 logging.info(f"✅ {symbol}: Получено через CoinGecko (1H)")
                 return df
     except Exception as e:
-        logging.warning(f"⚠️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
+        logging.warning(f"️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
@@ -193,22 +193,12 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
-    # НОВОЕ: Проверка Williams %R
-    wr14 = ta_data.get('wr14', -50)
-    wr21 = ta_data.get('wr21', -50)
-    wr_oversold = wr14 < -80 and wr21 < -80
-    
-    # ПОНИЖЕННЫЕ ПОРОГИ для достижения TP3
-    if rr_value >= 1.1 and volume_confirmed and wr_oversold:
-        return ("high", "🟢", "Высоковероятный сигнал (WR подтверждает)")
-    elif rr_value >= 1.1 and volume_confirmed:
-        return ("high", "", "Высоковероятный сигнал")
+    if rr_value >= 1.3 and volume_confirmed:
+        return ("high", "🟢", "Высоковероятный сигнал")
     elif rr_value >= 1.0 and volume_confirmed:
-        return ("medium", "", "Средняя вероятность")
-    elif rr_value >= 1.1 and wr_oversold:
-        return ("medium", "🟡", "Хороший R:R + WR перепроданность")
-    elif rr_value >= 1.0 and not volume_confirmed:
-        return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
+        return ("medium", "🟡", "Средняя вероятность")
+    elif rr_value >= 1.3 and not volume_confirmed:
+        return ("medium", "", "Хороший R:R, но объем не подтвержден")
     else:
         return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
 
@@ -257,13 +247,13 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     if quality_level == "high":
         rec = "✅ Сигнал соответствует всем критериям. Можно рассматривать вход."
     elif quality_level == "medium":
-        rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
+        rec = "️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
     else:
         rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
-📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
+ **КАЧЕСТВО СИГНАЛА:** {quality_desc}
 
 🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
@@ -300,13 +290,12 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • Обязательно используйте Stop Loss
 • Соотношение риск/прибыль должно быть ≥ 1:2 (текущее: 1:{rr_value})
 
-📜 **ДИСКЛЕЙМЕР:**
-⚠️ Не является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с риском потери средств. Проводите собственное исследование (DYOR)."""
+ **ДИСКЛЕЙМЕР:**
+️ Не является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с риском потери средств. Проводите собственное исследование (DYOR)."""
 
     return post
 
-def send_to_telegram(text: str, chart_paths: list, symbol: str):
-    """Отправляет сигнал в Telegram: несколько картинок, потом полный текст"""
+def send_to_telegram(text: str, chart_path: str, symbol: str):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
@@ -314,45 +303,35 @@ def send_to_telegram(text: str, chart_paths: list, symbol: str):
         logging.error("❌ Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
         return
 
-    # Отправляем все картинки по очереди
-    for i, chart_path in enumerate(chart_paths):
-        try:
-            with open(chart_path, 'rb') as f:
-                coin_name = symbol.replace('USDT', '')
-                
-                if i == 0:
-                    caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n🎯 Точка входа + SL/TP\n\n👇 *Осцилляторы ниже*"
-                elif i == 1:
-                    caption = f"📈 **MACD** — импульс тренда"
-                elif i == 2:
-                    caption = f"📉 **RSI + StochRSI** — перекупленность/перепроданность"
-                elif i == 3:
-                    caption = f" **Williams %R** — подтверждение разворота"
-                
-                files = {
-                    'photo': (f'chart_{i}.png', f, 'image/png'),
-                    'chat_id': (None, channel_id),
-                    'caption': (None, caption),
-                    'parse_mode': (None, 'Markdown')
-                }
-                
-                response = requests.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendPhoto",
-                    files=files,
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    logging.info(f"✅ Картинка {i+1}/{len(chart_paths)} отправлена!")
-                else:
-                    logging.error(f"❌ Ошибка отправки картинки {i+1}: {response.text}")
-                
-                time.sleep(1)
-                
-        except Exception as e:
-            logging.error(f"❌ Ошибка отправки картинки {i+1}: {e}")
+    try:
+        with open(chart_path, 'rb') as f:
+            coin_name = symbol.replace('USDT', '')
+            short_caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n"
+            short_caption += f"🎯 Точка входа + SL/TP\n\n"
+            short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
+            
+            files = {
+                'photo': ('signal_chart.png', f, 'image/png'),
+                'chat_id': (None, channel_id),
+                'caption': (None, short_caption),
+                'parse_mode': (None, 'Markdown')
+            }
+            response = requests.post(
+                f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+                files=files,
+                timeout=30
+            )
+            
+        if response.status_code == 200:
+            logging.info("✅ Картинка успешно отправлена в Telegram!")
+        else:
+            logging.error(f"❌ Ошибка отправки картинки: {response.text}")
+            
+        time.sleep(2)
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка отправки картинки: {e}")
     
-    # Отправляем полный текст
     try:
         max_length = 4000
         parts = []
@@ -398,7 +377,7 @@ def send_to_telegram(text: str, chart_paths: list, symbol: str):
         logging.error(f"❌ Ошибка отправки текста: {e}")
 
 def main():
-    logging.info("🌙 Запуск Лунного Дозора v3.0 (4 графика + строгая фильтрация)")
+    logging.info("🌙 Запуск Лунного Дозора v3.0 (1H таймфрейм, краткосрочные сигналы 4-8 часов)")
     
     health_checker = MarketHealthChecker()
     regime, _, _ = health_checker.get_market_regime()
@@ -429,94 +408,44 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
-        # НОВОЕ: Строгая фильтрация — минимум 3 индикатора должны подтверждать
-        confirmation_count = 0
-        
-        # 1. Тренд (EMA)
-        if "Бычий" in ta_data['trend'] or "Медвежий" in ta_data['trend']:
-            confirmation_count += 1
-        
-        # 2. Объем (PVT)
-        if "Да ✅" in ta_data['volume_confirmed']:
-            confirmation_count += 1
-        
-        # 3. RSI/StochRSI
-        rsi = ta_data.get('rsi', 50)
-        stoch_k = ta_data.get('stoch_k', 50)
-        if (rsi < 35 and stoch_k < 20) or (rsi > 65 and stoch_k > 80):
-            confirmation_count += 1
-        
-        # 4. Williams %R
-        wr14 = ta_data.get('wr14', -50)
-        wr21 = ta_data.get('wr21', -50)
-        if wr14 < -80 and wr21 < -80:
-            confirmation_count += 1
-        
-        # 5. Bollinger Bands
-        boll_status = ta_data.get('boll_status', '')
-        if "перепроданность" in boll_status.lower() or "перекупленность" in boll_status.lower():
-            confirmation_count += 1
-        
-        # Если меньше 3 подтверждений — пропускаем
-        if confirmation_count < 3:
-            logging.info(f"⏸️ {coin}: Только {confirmation_count}/5 индикаторов подтверждают. Пропускаем.")
+        # ЖЕСТКАЯ ФИЛЬТРАЦИЯ: не отправляем сигналы низкого качества
+        if quality_level == "low":
+            logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
             continue
         
         try:
             rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
             if rr_value > 10.0:
                 rr_value = 1.0
-                logging.warning(f"⚠️ {coin}: Аномальный R:R, нормализован")
+                logging.warning(f"⚠️ {coin}: Аномальный R:R в signal_generator, нормализован")
         except:
             rr_value = 0.0
         
-        score = rr_value + (0.5 if "Да ✅" in ta_data['volume_confirmed'] else 0) + (confirmation_count * 0.2)
-        logging.info(f"✅ {coin}: Score {score} (подтверждений: {confirmation_count}/5)")
+        # ЖЕСТКАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 1.0
+        if rr_value < 1.0:
+            logging.info(f"⏸️ {coin}: R:R < 1.0 ({rr_value}). Пропускаем.")
+            continue
+        
+        score = rr_value + (0.5 if "Да ✅" in ta_data['volume_confirmed'] else 0)
+        logging.info(f"✅ {coin}: Score {score}")
         
         if score > best_score:
             best_score = score
-            best_coin = {
-                "symbol": coin, 
-                "ta": ta_data, 
-                "patterns": pattern_data, 
-                "df": df, 
-                "ql": quality_level, 
-                "qe": quality_emoji, 
-                "qd": quality_desc,
-                "confirmations": confirmation_count
-            }
+            best_coin = {"symbol": coin, "ta": ta_data, "patterns": pattern_data, "df": df, "ql": quality_level, "qe": quality_emoji, "qd": quality_desc}
     
     if best_coin:
         is_long = "Бычий" in best_coin['ta']['trend']
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся. Пропускаем.")
+            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
             return
         
-        logging.info(f"🏆 Лучшая: {best_coin['symbol']} (подтверждений: {best_coin['confirmations']}/5)")
-        
-        # НОВОЕ: Генерируем все 4 графика
-        chart_paths = visualizer.generate_all_charts(
-            best_coin['df'], 
-            best_coin['symbol'], 
-            best_coin['ta']
-        )
-        
-        if chart_paths:
-            post_text = generate_analysis_post(
-                best_coin['symbol'], 
-                best_coin['ta'], 
-                best_coin['patterns'], 
-                regime, 
-                macro_warning, 
-                best_coin['ql'], 
-                best_coin['qe'], 
-                best_coin['qd']
-            )
-            send_to_telegram(post_text, chart_paths, best_coin['symbol'])
-        else:
-            logging.error("❌ Не удалось сгенерировать графики")
+        logging.info(f" Лучшая: {best_coin['symbol']}")
+        chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"signal_{best_coin['symbol']}.png")
+        if chart_path:
+            post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
+            send_to_telegram(post_text, chart_path, best_coin['symbol'])
     else:
         logging.error("❌ СБОЙ: Не удалось получить данные ни для одной монеты.")
 
