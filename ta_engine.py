@@ -13,6 +13,8 @@ class TAEngine:
         self.macd_slow = 26
         self.macd_signal = 9
         self.stoch_rsi_length = 14
+        self.wr_period1 = 14   # НОВОЕ: Williams %R короткий
+        self.wr_period2 = 21   # НОВОЕ: Williams %R длинный
 
     def analyze(self, df: pd.DataFrame) -> dict:
         try:
@@ -87,7 +89,34 @@ class TAEngine:
             except Exception:
                 atr = (float(df['high'].iloc[-1]) - float(df['low'].iloc[-1])) * 1.5
 
-            # 6. УРОВНИ SL/TP
+                        # 6. WILLIAMS %R (НОВОЕ! Шаг 3)
+            try:
+                wr_indicator1 = ta.momentum.WilliamsRIndicator(
+                    high=df['high'], low=df['low'], close=df['close'], lbp=self.wr_period1
+                )
+                wr14 = float(wr_indicator1.williams_r().iloc[-1])
+                
+                wr_indicator2 = ta.momentum.WilliamsRIndicator(
+                    high=df['high'], low=df['low'], close=df['close'], lbp=self.wr_period2
+                )
+                wr21 = float(wr_indicator2.williams_r().iloc[-1])
+                
+                # Определяем статус
+                if wr14 < -80 and wr21 < -80:
+                    wr_status = "Оба WR в перепроданности (сильный сигнал на покупку) 🟢"
+                elif wr14 > -20 and wr21 > -20:
+                    wr_status = "Оба WR в перекупленности (сигнал на продажу) 🔴"
+                elif wr14 < -80:
+                    wr_status = "WR14 в перепроданности (потенциальный отскок) 🟢"
+                elif wr21 < -80:
+                    wr_status = "WR21 в перепроданности (потенциальный отскок) 🟡"
+                else:
+                    wr_status = "WR в нейтральной зоне ⚪"
+            except Exception:
+                wr14, wr21 = -50.0, -50.0
+                wr_status = "Недоступно ⚪"
+            
+            # 7. УРОВНИ SL/TP
             recent_lows = float(df['low'].iloc[-48:].min())
             recent_highs = float(df['high'].iloc[-48:].max())
             
@@ -116,7 +145,7 @@ class TAEngine:
 
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
-            # 6. BOLLINGER BANDS (НОВОЕ! Шаг 2)
+            # 8. BOLLINGER BANDS (НОВОЕ! Шаг 2)
             try:
                 bollinger = ta.volatility.BollingerBands(
                     close=df['close'], window=20, window_dev=2
@@ -136,7 +165,7 @@ class TAEngine:
                 boll_upper, boll_middle, boll_lower = 0, 0, 0
                 boll_status = "Недоступно ⚪"
             
-            # 7. УРОВНИ ФИБОНАЧЧИ (НОВОЕ! Шаг 1)
+            # 9. УРОВНИ ФИБОНАЧЧИ (НОВОЕ! Шаг 1)
             try:
                 recent_high = float(df['high'].iloc[-48:].max())
                 recent_low = float(df['low'].iloc[-48:].min())
@@ -172,14 +201,18 @@ class TAEngine:
                 "rsi": round(rsi, 2),
                 "stoch_k": round(stoch_k, 2),
                 "atr": round(atr, 4),
-                # 👇 ДОБАВЛЕНО: Уровни Фибоначчи (Шаг 1 завершен)
-                "fib_levels": fib_levels,
-                "fib_status": fib_status,
                 # Bollinger Bands (Шаг 2)
                 "boll_upper": round(boll_upper, 4),
                 "boll_middle": round(boll_middle, 4),
                 "boll_lower": round(boll_lower, 4),
-                "boll_status": boll_status
+                "boll_status": boll_status,
+                # 👇 ДОБАВЛЕНО: Уровни Фибоначчи (Шаг 1 завершен)
+                "fib_levels": fib_levels,
+                "fib_status": fib_status,
+                # Williams %R (Шаг 3) 👇 ДОБАВЛЕНО
+                "wr14": round(wr14, 2),
+                "wr21": round(wr21, 2),
+                "wr_status": wr_status
             }
 
         except Exception as e:
