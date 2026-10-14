@@ -151,7 +151,7 @@ class TAEngine:
                 "estimated_R:R": f"1 : {rr_ratio} ({rr_status})",
                 "rsi": round(rsi, 2),
                 "stoch_k": round(stoch_k, 2),
-                "atr": round(atr, 4)
+                "atr": round(atr, 4),
                 # 👇 ДОБАВЛЕНО: Уровни Фибоначчи (Шаг 1 завершен)
                 "fib_levels": fib_levels,
                 "fib_status": fib_status
