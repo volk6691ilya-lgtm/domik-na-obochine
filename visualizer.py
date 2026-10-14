@@ -30,18 +30,35 @@ class ChartVisualizer:
             tp_level = ta_data.get("tp") or ta_data.get("resistance_level (TP)")
             entry_level = ta_data.get("entry", ta_data.get("price", "N/A"))
 
-            # Определяем направление для расчёта TP1/TP2/TP3
+            # ✅ ИСПОЛЬЗУЕМ УРОВНИ ФИБОНАЧЧИ ИЗ TA_DATA (ШАГ 4)
+            fib_levels = ta_data.get('fib_levels', {})
+            
+            # Определяем направление
             is_long = "Бычий" in ta_data.get('trend', '')
-
-            # Рассчитываем TP1, TP2, TP3 (как в signal_generator.py)
+            
+            # Рассчитываем TP1, TP2, TP3 на основе Фибоначчи
             tp1 = None
             tp2 = None
             tp3 = None
-
-            if entry_level != "N/A" and tp_level:
+            
+            if entry_level != "N/A" and fib_levels:
+                entry_float = float(entry_level)
+                
+                if is_long:
+                    # Для лонга: 0.618 (золотое сечение), 1.0 (максимум), 1.618 (расширение)
+                    tp1 = fib_levels.get('0.618', round(entry_float + (float(tp_level) - entry_float) * 0.4, 4))
+                    tp2 = fib_levels.get('1.0', round(entry_float + (float(tp_level) - entry_float) * 0.7, 4))
+                    tp3 = fib_levels.get('1.618', float(tp_level))
+                else:
+                    # Для шорта: 0.618 (ближайшая поддержка), 0.382 (глубокий откат), 0.0 (минимум)
+                    tp1 = fib_levels.get('0.618', round(entry_float - (entry_float - float(tp_level)) * 0.4, 4))
+                    tp2 = fib_levels.get('0.382', round(entry_float - (entry_float - float(tp_level)) * 0.7, 4))
+                    tp3 = fib_levels.get('0.0', float(tp_level))
+            elif entry_level != "N/A" and tp_level:
+                # Фоллбэк на старую логику, если Фибоначчи нет
                 entry_float = float(entry_level)
                 tp_float = float(tp_level)
-
+                
                 if is_long:
                     tp1 = round(entry_float + (tp_float - entry_float) * 0.4, 4)
                     tp2 = round(entry_float + (tp_float - entry_float) * 0.7, 4)
@@ -69,19 +86,19 @@ class ChartVisualizer:
                     hlines_colors.append('dodgerblue')
                     hlines_styles.append('-')
 
-            # 3. TP1 (Оранжевый) — точки (40% движения)
+            # 3. TP1 (Оранжевый) — точки
             if tp1 is not None and tp1 not in hlines:
                 hlines.append(tp1)
                 hlines_colors.append('orange')
                 hlines_styles.append(':')
 
-            # 4. TP2 (Оранжево-красный) — точки (70% движения)
+            # 4. TP2 (Оранжево-красный) — точки
             if tp2 is not None and tp2 not in hlines:
                 hlines.append(tp2)
                 hlines_colors.append('orangered')
                 hlines_styles.append(':')
 
-            # 5. TP3 (Красный) — пунктир (100% движения)
+            # 5. TP3 (Красный) — пунктир
             if tp3 is not None and tp3 not in hlines:
                 hlines.append(tp3)
                 hlines_colors.append('red')
@@ -119,7 +136,7 @@ class ChartVisualizer:
 
 # Блок для локального тестирования
 if __name__ == "__main__":
-    print("\n--- Тест Chart Visualizer (Генерация графика с Entry, SL, TP1/TP2/TP3) ---")
+    print("\n--- Тест Chart Visualizer (с Фибоначчи) ---")
 
     np.random.seed(42)
     dates = pd.date_range(end='2026-09-28', periods=50, freq='1h')
@@ -133,14 +150,20 @@ if __name__ == "__main__":
         'open': opens, 'high': highs, 'low': lows, 'close': closes, 'volume': volumes
     }, index=dates)
 
-    # Тестовые данные
+    # Тестовые данные с Фибоначчи (как в реальном ta_engine.py)
     mock_ta_data = {
         "price": 98.50,
         "entry": 98.00,
         "sl": 95.00,
         "tp": 105.00,
         "trend": "Бычий 🟢 (Цена > EMA50)",
-        "estimated_R:R": "1 : 2.5"
+        "estimated_R:R": "1 : 2.5",
+        "fib_levels": {
+            '0.0': 95.00,
+            '0.618': 102.37,  # TP1
+            '1.0': 105.00,    # TP2
+            '1.618': 109.58   # TP3
+        }
     }
 
     visualizer = ChartVisualizer()
@@ -148,12 +171,13 @@ if __name__ == "__main__":
 
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
-        print("👉 На графике 5 линий:")
-        print("   🟢 SL (зелёный пунктир)")
-        print("   🔵 Entry (синяя сплошная)")
-        print("   🟠 TP1 (оранжевый пунктир) — 40%")
-        print("    TP2 (оранжево-красный пунктир) — 70%")
-        print("   🔴 TP3 (красный пунктир) — 100%")
+        print("👉 На графике 5 линий (теперь по Фибоначчи):")
+        print("   🟢 SL (зелёный пунктир): $95.00")
+        print("   🔵 Entry (синяя сплошная): $98.00")
+        print("   🟠 TP1 (оранжевый пунктир): $102.37 (0.618)")
+        print("   🟠 TP2 (оранжево-красный пунктир): $105.00 (1.0)")
+        print("    TP3 (красный пунктир): $109.58 (1.618)")
+        print("\n💡 Теперь TP на графике и в тексте будут СОВПАДАТЬ!")
     else:
         print("\n❌ Ошибка при создании графика.")
 
