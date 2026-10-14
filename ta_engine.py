@@ -116,7 +116,27 @@ class TAEngine:
 
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
-                        # 7. УРОВНИ ФИБОНАЧЧИ (НОВОЕ! Шаг 1)
+            # 6. BOLLINGER BANDS (НОВОЕ! Шаг 2)
+            try:
+                bollinger = ta.volatility.BollingerBands(
+                    close=df['close'], window=20, window_dev=2
+                )
+                boll_upper = float(bollinger.bollinger_hband().iloc[-1])
+                boll_middle = float(bollinger.bollinger_mavg().iloc[-1])
+                boll_lower = float(bollinger.bollinger_lband().iloc[-1])
+                
+                # Определяем положение цены
+                if current_price <= boll_lower:
+                    boll_status = "У нижней полосы (перепроданность) 🟢"
+                elif current_price >= boll_upper:
+                    boll_status = "У верхней полосы (перекупленность) 🔴"
+                else:
+                    boll_status = "Внутри полос (нейтрально) ⚪"
+            except Exception:
+                boll_upper, boll_middle, boll_lower = 0, 0, 0
+                boll_status = "Недоступно ⚪"
+            
+            # 7. УРОВНИ ФИБОНАЧЧИ (НОВОЕ! Шаг 1)
             try:
                 recent_high = float(df['high'].iloc[-48:].max())
                 recent_low = float(df['low'].iloc[-48:].min())
@@ -154,7 +174,12 @@ class TAEngine:
                 "atr": round(atr, 4),
                 # 👇 ДОБАВЛЕНО: Уровни Фибоначчи (Шаг 1 завершен)
                 "fib_levels": fib_levels,
-                "fib_status": fib_status
+                "fib_status": fib_status,
+                # Bollinger Bands (Шаг 2)
+                "boll_upper": round(boll_upper, 4),
+                "boll_middle": round(boll_middle, 4),
+                "boll_lower": round(boll_lower, 4),
+                "boll_status": boll_status
             }
 
         except Exception as e:
