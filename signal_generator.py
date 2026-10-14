@@ -398,7 +398,7 @@ def send_to_telegram(text: str, chart_paths: list, symbol: str):
         logging.error(f"❌ Ошибка отправки текста: {e}")
 
 def main():
-    logging.info("🌙 Запуск Лунного Дозора v3.0 (1H таймфрейм, краткосрочные сигналы 4-8 часов)")
+    logging.info("🌙 Запуск Лунного Дозора v3.0 (4 графика + строгая фильтрация)")
     
     health_checker = MarketHealthChecker()
     regime, _, _ = health_checker.get_market_regime()
@@ -429,34 +429,94 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
+        # НОВОЕ: Строгая фильтрация — минимум 3 индикатора должны подтверждать
+        confirmation_count = 0
+        
+        # 1. Тренд (EMA)
+        if "Бычий" in ta_data['trend'] or "Медвежий" in ta_data['trend']:
+            confirmation_count += 1
+        
+        # 2. Объем (PVT)
+        if "Да ✅" in ta_data['volume_confirmed']:
+            confirmation_count += 1
+        
+        # 3. RSI/StochRSI
+        rsi = ta_data.get('rsi', 50)
+        stoch_k = ta_data.get('stoch_k', 50)
+        if (rsi < 35 and stoch_k < 20) or (rsi > 65 and stoch_k > 80):
+            confirmation_count += 1
+        
+        # 4. Williams %R
+        wr14 = ta_data.get('wr14', -50)
+        wr21 = ta_data.get('wr21', -50)
+        if wr14 < -80 and wr21 < -80:
+            confirmation_count += 1
+        
+        # 5. Bollinger Bands
+        boll_status = ta_data.get('boll_status', '')
+        if "перепроданность" in boll_status.lower() or "перекупленность" in boll_status.lower():
+            confirmation_count += 1
+        
+        # Если меньше 3 подтверждений — пропускаем
+        if confirmation_count < 3:
+            logging.info(f"⏸️ {coin}: Только {confirmation_count}/5 индикаторов подтверждают. Пропускаем.")
+            continue
+        
         try:
             rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
             if rr_value > 10.0:
                 rr_value = 1.0
-                logging.warning(f"⚠️ {coin}: Аномальный R:R в signal_generator, нормализован")
+                logging.warning(f"⚠️ {coin}: Аномальный R:R, нормализован")
         except:
             rr_value = 0.0
         
-        score = rr_value + (0.5 if "Да ✅" in ta_data['volume_confirmed'] else 0)
-        logging.info(f"✅ {coin}: Score {score}")
+        score = rr_value + (0.5 if "Да ✅" in ta_data['volume_confirmed'] else 0) + (confirmation_count * 0.2)
+        logging.info(f"✅ {coin}: Score {score} (подтверждений: {confirmation_count}/5)")
         
         if score > best_score:
             best_score = score
-            best_coin = {"symbol": coin, "ta": ta_data, "patterns": pattern_data, "df": df, "ql": quality_level, "qe": quality_emoji, "qd": quality_desc}
+            best_coin = {
+                "symbol": coin, 
+                "ta": ta_data, 
+                "patterns": pattern_data, 
+                "df": df, 
+                "ql": quality_level, 
+                "qe": quality_emoji, 
+                "qd": quality_desc,
+                "confirmations": confirmation_count
+            }
     
     if best_coin:
         is_long = "Бычий" in best_coin['ta']['trend']
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся. Пропускаем.")
             return
         
-        logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
-        chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"signal_{best_coin['symbol']}.png")
-        if chart_path:
-            post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
-            send_to_telegram(post_text, chart_path, best_coin['symbol'])
+        logging.info(f"🏆 Лучшая: {best_coin['symbol']} (подтверждений: {best_coin['confirmations']}/5)")
+        
+        # НОВОЕ: Генерируем все 4 графика
+        chart_paths = visualizer.generate_all_charts(
+            best_coin['df'], 
+            best_coin['symbol'], 
+            best_coin['ta']
+        )
+        
+        if chart_paths:
+            post_text = generate_analysis_post(
+                best_coin['symbol'], 
+                best_coin['ta'], 
+                best_coin['patterns'], 
+                regime, 
+                macro_warning, 
+                best_coin['ql'], 
+                best_coin['qe'], 
+                best_coin['qd']
+            )
+            send_to_telegram(post_text, chart_paths, best_coin['symbol'])
+        else:
+            logging.error("❌ Не удалось сгенерировать графики")
     else:
         logging.error("❌ СБОЙ: Не удалось получить данные ни для одной монеты.")
 
