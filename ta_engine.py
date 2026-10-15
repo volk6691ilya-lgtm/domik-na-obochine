@@ -144,24 +144,41 @@ class TAEngine:
 
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
-            # 8. BOLLINGER BANDS
-            try:
-                bollinger = ta.volatility.BollingerBands(
-                    close=df['close'], window=20, window_dev=2
-                )
-                boll_upper = float(bollinger.bollinger_hband().iloc[-1])
-                boll_middle = float(bollinger.bollinger_mavg().iloc[-1])
-                boll_lower = float(bollinger.bollinger_lband().iloc[-1])
-                
-                if current_price <= boll_lower:
-                    boll_status = "У нижней полосы (перепроданность) 🟢"
-                elif current_price >= boll_upper:
-                    boll_status = "У верхней полосы (перекупленность) 🔴"
-                else:
-                    boll_status = "Внутри полос (нейтрально) ⚪"
-            except Exception:
-                boll_upper, boll_middle, boll_lower = 0, 0, 0
-                boll_status = "Недоступно ⚪"
+            # 8. BOLLINGER BANDS + SQUEEZE DETECTION (Направление 3)
+try:
+    bollinger = ta.volatility.BollingerBands(
+        close=df['close'], window=20, window_dev=2
+    )
+    boll_upper = float(bollinger.bollinger_hband().iloc[-1])
+    boll_middle = float(bollinger.bollinger_mavg().iloc[-1])
+    boll_lower = float(bollinger.bollinger_lband().iloc[-1])
+    
+    # Определяем положение цены
+    if current_price <= boll_lower:
+        boll_status = "У нижней полосы (перепроданность) 🟢"
+    elif current_price >= boll_upper:
+        boll_status = "У верхней полосы (перекупленность) 🔴"
+    else:
+        boll_status = "Внутри полос (нейтрально) ⚪"
+    
+    # 🔍 НАПРАВЛЕНИЕ 3: Определяем Bollinger Squeeze (сужение канала)
+    # Считаем текущую ширину канала
+    current_width = boll_upper - boll_lower
+    
+    # Берем исторические данные ширины канала за последние 20 свечей
+    boll_upper_series = bollinger.bollinger_hband().iloc[-20:]
+    boll_lower_series = bollinger.bollinger_lband().iloc[-20:]
+    historical_width = (boll_upper_series - boll_lower_series).mean()
+    
+    # Если текущая ширина < 80% от средней исторической → Squeeze
+    if current_width < historical_width * 0.8:
+        squeeze_warning = "⚡ Сужение канала (Squeeze)! Ожидается пробой. "
+        boll_status = squeeze_warning + boll_status
+        logging.info(f"🔍 Bollinger Squeeze detected! Width: {current_width:.2f}, Avg: {historical_width:.2f}")
+        
+except Exception:
+    boll_upper, boll_middle, boll_lower = 0, 0, 0
+    boll_status = "Недоступно ⚪"
             
             # 9. УРОВНИ ФИБОНАЧЧИ
             try:
