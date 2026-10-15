@@ -16,6 +16,27 @@ from visualizer import ChartVisualizer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def get_anti_bot_price(price: float, symbol: str) -> float:
+    """
+    Гарантирует, что 4-й знак после запятой НИКОГДА не будет равен 0.
+    Добавляет детерминированный микро-сдвиг (0.0001 - 0.0009) на основе названия монеты,
+    чтобы уровни не выглядели как "круглые" числа для ботов-хантеров.
+    """
+    base_price = round(float(price), 4)
+    # Проверяем последнюю цифру (4-й знак после запятой)
+    last_digit = int(round(base_price * 10000)) % 10
+    
+    if last_digit == 0:
+        # Генерируем сдвиг от 1 до 9 на основе суммы ASCII-кодов символов тикера
+        jitter = 0.0001 * ((sum(ord(c) for c in symbol) % 9) + 1)
+        base_price = round(base_price + jitter, 4)
+        
+        # Двойная проверка на случай математического переноса (крайне редко)
+        if int(round(base_price * 10000)) % 10 == 0:
+            base_price = round(base_price + 0.0001, 4)
+            
+    return base_price
+
 BROWSER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -259,18 +280,26 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
+        # Применяем защиту от круглых чисел ко всем уровням
+    entry_fmt = get_anti_bot_price(float(entry), symbol)
+    sl_fmt = get_anti_bot_price(float(sl), symbol)
+    tp1_fmt = get_anti_bot_price(float(tp1), symbol)
+    tp2_fmt = get_anti_bot_price(float(tp2), symbol)
+    tp3_fmt = get_anti_bot_price(float(tp3), symbol)
+
+    # Формируем пост с профессиональным форматированием (4 знака, без нулей на конце)
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
 
 🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
-• 🔵 **Точка входа (Entry):** ${entry}
-• 🟢 **Стоп-лосс (SL):** ${sl} *(если цена {sl_text} — выходим)*
+• 🔵 **Точка входа (Entry):** ${entry_fmt:.4f}
+• 🟢 **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
 • 🔴 **Цели прибыли (TP):**
-  - TP1: ${tp1} *(фиксация 40% прибыли)*
-  - TP2: ${tp2} *(фиксация 70% прибыли)*
-  - TP3: ${tp3} *(полная цель)*
+  - TP1: ${tp1_fmt:.4f} *(фиксация 40% прибыли)*
+  - TP2: ${tp2_fmt:.4f} *(фиксация 70% прибыли)*
+  - TP3: ${tp3_fmt:.4f} *(полная цель)*
 • **Плечо:** {leverage} *(безопасно для новичков)*
 • Соотношение Риск/Прибыль: **1:{rr_value}**
 
