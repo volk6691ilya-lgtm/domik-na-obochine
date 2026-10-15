@@ -208,11 +208,28 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         rr_value = 0.0
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
+    is_long = "Бычий" in ta_data.get('trend', '')
     
-    # 🔒 ПОРОГИ ПОВЫШЕНЫ для большей безопасности (исправлено соответствие кода и комментария)
+    # Получаем статусы индикаторов для анализа конвергенции (Направление 2)
+    boll_status = ta_data.get('boll_status', '').lower()
+    wr_status = ta_data.get('wr_status', '').lower()
+    
+    # Проверяем совпадение направления с Bollinger и WR
+    # Для лонга: цена у нижней полосы И WR в перепроданности
+    # Для шорта: цена у верхней полосы И WR в перекупленности
+    bb_aligned = (is_long and "нижней" in boll_status) or (not is_long and "верхней" in boll_status)
+    wr_aligned = (is_long and "перепроданн" in wr_status) or (not is_long and "перекупленн" in wr_status)
+    
+    # Мощное подтверждение: совпадение BB + WR + Объем
+    strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
+
+    # 🔒 ПОРОГИ С УЧЕТОМ ДОПОЛНИТЕЛЬНЫХ ПОДТВЕРЖДЕНИЙ
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 0.9 and volume_confirmed:  # Исправлено: было 0.5, стало 0.9
+    elif rr_value >= 0.9 and strong_confirmation:
+        # Бонус: R:R >= 0.9, но есть мощное подтверждение от BB, WR и объема
+        return ("high", "🟢", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
+    elif rr_value >= 0.9 and volume_confirmed:
         return ("medium", "🟡", "Средняя вероятность")
     elif rr_value >= 1.3 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
