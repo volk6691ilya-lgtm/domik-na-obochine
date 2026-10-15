@@ -280,6 +280,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 
 📉 **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
 • Тренд: {ta_data['trend']}
+• Bollinger Bands: {ta_data.get('boll_status', 'Недоступно ⚪')}
 • Импульс: {ta_data['momentum']}
 • MACD: {ta_data['macd']}
 • Объем (PVT): {ta_data['volume_confirmed']}
