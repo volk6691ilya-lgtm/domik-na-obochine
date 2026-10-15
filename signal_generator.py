@@ -23,15 +23,11 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
     чтобы уровни не выглядели как "круглые" числа для ботов-хантеров.
     """
     base_price = round(float(price), 4)
-    # Проверяем последнюю цифру (4-й знак после запятой)
     last_digit = int(round(base_price * 10000)) % 10
     
     if last_digit == 0:
-        # Генерируем сдвиг от 1 до 9 на основе суммы ASCII-кодов символов тикера
         jitter = 0.0001 * ((sum(ord(c) for c in symbol) % 9) + 1)
         base_price = round(base_price + jitter, 4)
-        
-        # Двойная проверка на случай математического переноса (крайне редко)
         if int(round(base_price * 10000)) % 10 == 0:
             base_price = round(base_price + 0.0001, 4)
             
@@ -213,10 +209,10 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     
-    # 🔒 ПОРОГИ ПОВЫШЕНЫ на +0.4 от тестовых значений для большей безопасности
+    # 🔒 ПОРОГИ ПОВЫШЕНЫ для большей безопасности (исправлено соответствие кода и комментария)
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 0.5 and volume_confirmed:  # Было 0.5, стало 0.9
+    elif rr_value >= 0.9 and volume_confirmed:  # Исправлено: было 0.5, стало 0.9
         return ("medium", "🟡", "Средняя вероятность")
     elif rr_value >= 1.3 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
@@ -235,7 +231,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
     direction_emoji = "🟢" if is_long else "🔴"
     
-    # ✅ ИСПОЛЬЗОВАНИЕ УРОВНЕЙ ФИБОНАЧЧИ ДЛЯ ЦЕЛЕЙ
     entry = ta_data['entry']
     sl = ta_data['sl']
     tp = ta_data['tp']
@@ -250,7 +245,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         tp2 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.7, 4))
         tp3 = fib_levels.get('0.0', tp)
     
-    # 🔧 ДИНАМИЧЕСКИЙ ТЕКСТ ДЛЯ STOP-LOSS
     if sl > entry:
         sl_text = "вырастет выше"
     else:
@@ -280,14 +274,13 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
-        # Применяем защиту от круглых чисел ко всем уровням
+    # 🔧 ИСПРАВЛЕНИЕ: Выровнен отступ. Теперь защита от круглых чисел применяется ВСЕГДА, а не только в else
     entry_fmt = get_anti_bot_price(float(entry), symbol)
     sl_fmt = get_anti_bot_price(float(sl), symbol)
     tp1_fmt = get_anti_bot_price(float(tp1), symbol)
     tp2_fmt = get_anti_bot_price(float(tp2), symbol)
     tp3_fmt = get_anti_bot_price(float(tp3), symbol)
 
-    # Формируем пост с профессиональным форматированием (4 знака, без нулей на конце)
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
@@ -446,7 +439,6 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
-        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: не отправляем сигналы низкого качества
         if quality_level == "low":
             logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
             continue
@@ -459,8 +451,8 @@ def main():
         except:
             rr_value = 0.0
         
-        # 🔒 ПОРОГ ОТСЕЧЕНИЯ ПОВЫШЕН с 0.3 до 0.7 (+0.4)
-        if rr_value < 0.3:
+        # 🔒 ИСПРАВЛЕНО: Порог отсечения теперь реально 0.7, как указано в комментарии
+        if rr_value < 0.7:
             logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
