@@ -9,6 +9,27 @@ warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def get_anti_bot_price(price: float, symbol: str) -> float:
+    """
+    Гарантирует, что 4-й знак после запятой НИКОГДА не будет равен 0.
+    Добавляет детерминированный микро-сдвиг (0.0001 - 0.0009) на основе названия монеты,
+    чтобы уровни не выглядели как "круглые" числа для ботов-хантеров.
+    """
+    base_price = round(float(price), 4)
+    # Проверяем последнюю цифру (4-й знак после запятой)
+    last_digit = int(round(base_price * 10000)) % 10
+    
+    if last_digit == 0:
+        # Генерируем сдвиг от 1 до 9 на основе суммы ASCII-кодов символов тикера
+        jitter = 0.0001 * ((sum(ord(c) for c in symbol) % 9) + 1)
+        base_price = round(base_price + jitter, 4)
+        
+        # Двойная проверка на случай математического переноса (крайне редко)
+        if int(round(base_price * 10000)) % 10 == 0:
+            base_price = round(base_price + 0.0001, 4)
+            
+    return base_price
+
 class ChartVisualizer:
     """
     Модуль для генерации профессиональных графиков с разметкой уровней.
@@ -45,12 +66,10 @@ class ChartVisualizer:
                 entry_float = float(entry_level)
                 
                 if is_long:
-                    # Для лонга: 0.618 (золотое сечение), 1.0 (максимум), 1.618 (расширение)
                     tp1 = fib_levels.get('0.618', round(entry_float + (float(tp_level) - entry_float) * 0.4, 4))
                     tp2 = fib_levels.get('1.0', round(entry_float + (float(tp_level) - entry_float) * 0.7, 4))
                     tp3 = fib_levels.get('1.618', float(tp_level))
                 else:
-                    # Для шорта: 0.618 (ближайшая поддержка), 0.382 (глубокий откат), 0.0 (минимум)
                     tp1 = fib_levels.get('0.618', round(entry_float - (entry_float - float(tp_level)) * 0.4, 4))
                     tp2 = fib_levels.get('0.382', round(entry_float - (entry_float - float(tp_level)) * 0.7, 4))
                     tp3 = fib_levels.get('0.0', float(tp_level))
@@ -68,53 +87,55 @@ class ChartVisualizer:
                     tp2 = round(entry_float - (entry_float - tp_float) * 0.7, 4)
                     tp3 = tp_float
 
+            # 🛡️ ПРИМЕНЯЕМ ЗАЩИТУ ОТ КРУГЛЫХ ЧИСЕЛ (Anti-Bot Price)
+            entry_fmt = get_anti_bot_price(float(entry_level), symbol) if entry_level != "N/A" else 0.0
+            sl_fmt = get_anti_bot_price(float(sl_level), symbol) if sl_level else 0.0
+            tp1_fmt = get_anti_bot_price(float(tp1), symbol) if tp1 is not None else 0.0
+            tp2_fmt = get_anti_bot_price(float(tp2), symbol) if tp2 is not None else 0.0
+            tp3_fmt = get_anti_bot_price(float(tp3), symbol) if tp3 is not None else 0.0
+
             hlines = []
             hlines_colors = []
             hlines_styles = []
 
             # 1. Стоп-лосс (Зеленый) — пунктир
             if sl_level:
-                hlines.append(float(sl_level))
+                hlines.append(sl_fmt)
                 hlines_colors.append('lime')
                 hlines_styles.append('--')
 
             # 2. Точка входа (Синий) — сплошная
             if entry_level and entry_level != "N/A":
-                entry_float = float(entry_level)
-                if entry_float not in hlines:
-                    hlines.append(entry_float)
-                    hlines_colors.append('dodgerblue')
-                    hlines_styles.append('-')
+                hlines.append(entry_fmt)
+                hlines_colors.append('dodgerblue')
+                hlines_styles.append('-')
 
             # 3. TP1 (Оранжевый) — точки
-            if tp1 is not None and tp1 not in hlines:
-                hlines.append(tp1)
+            if tp1 is not None:
+                hlines.append(tp1_fmt)
                 hlines_colors.append('orange')
                 hlines_styles.append(':')
 
             # 4. TP2 (Оранжево-красный) — точки
-            if tp2 is not None and tp2 not in hlines:
-                hlines.append(tp2)
+            if tp2 is not None:
+                hlines.append(tp2_fmt)
                 hlines_colors.append('orangered')
                 hlines_styles.append(':')
 
             # 5. TP3 (Красный) — пунктир
-            if tp3 is not None and tp3 not in hlines:
-                hlines.append(tp3)
+            if tp3 is not None:
+                hlines.append(tp3_fmt)
                 hlines_colors.append('red')
                 hlines_styles.append('--')
 
-            # 6. BOLLINGER BANDS (НОВОЕ! Шаг 5: Визуализация)
+            # 6. BOLLINGER BANDS (Шаг 5: Визуализация)
             if 'boll_upper' in ta_data and 'boll_middle' in ta_data and 'boll_lower' in ta_data:
-                # Верхняя полоса
                 hlines.append(float(ta_data['boll_upper']))
                 hlines_colors.append('gray')
                 hlines_styles.append('-.')
-                # Средняя линия (SMA 20)
                 hlines.append(float(ta_data['boll_middle']))
                 hlines_colors.append('gray')
                 hlines_styles.append('--')
-                # Нижняя полоса
                 hlines.append(float(ta_data['boll_lower']))
                 hlines_colors.append('gray')
                 hlines_styles.append('-.')
@@ -123,8 +144,8 @@ class ChartVisualizer:
             mc = mpf.make_marketcolors(up='g', down='r', edge='i', wick='i', volume='in', inherit=True)
             s = mpf.make_mpf_style(marketcolors=mc, base_mpf_style='charles')
 
-            # Обновленный заголовок с TP1/TP2/TP3
-            title = f"{symbol} | Entry: ${entry_level} | SL: ${sl_level} | TP1: ${tp1} | TP2: ${tp2} | TP3: ${tp3}"
+            # Обновленный заголовок с форматированием .4f (всегда 4 знака после запятой)
+            title = f"{symbol} | Entry: ${entry_fmt:.4f} | SL: ${sl_fmt:.4f} | TP1: ${tp1_fmt:.4f} | TP2: ${tp2_fmt:.4f} | TP3: ${tp3_fmt:.4f}"
             filepath = os.path.join(self.output_dir, filename)
 
             # ГЕНЕРАЦИЯ ГРАФИКА
@@ -151,7 +172,7 @@ class ChartVisualizer:
 
 # Блок для локального тестирования
 if __name__ == "__main__":
-    print("\n--- Тест Chart Visualizer (с Фибоначчи и Bollinger Bands) ---")
+    print("\n--- Тест Chart Visualizer (с Anti-Bot Price и Bollinger Bands) ---")
 
     np.random.seed(42)
     dates = pd.date_range(end='2026-10-14', periods=50, freq='1h')
@@ -165,23 +186,23 @@ if __name__ == "__main__":
         'open': opens, 'high': highs, 'low': lows, 'close': closes, 'volume': volumes
     }, index=dates)
 
-    # Тестовые данные с Фибоначчи и Bollinger Bands (как в реальном ta_engine.py)
+    # Тестовые данные с "круглыми" числами, чтобы проверить работу функции
     mock_ta_data = {
-        "price": 98.50,
-        "entry": 98.00,
-        "sl": 95.00,
-        "tp": 105.00,
+        "price": 98.0000,
+        "entry": 98.0000,
+        "sl": 95.0000,
+        "tp": 105.0000,
         "trend": "Бычий 🟢 (Цена > EMA50)",
         "estimated_R:R": "1 : 2.5",
         "fib_levels": {
-            '0.0': 95.00,
-            '0.618': 102.37,  # TP1
-            '1.0': 105.00,    # TP2
-            '1.618': 109.58   # TP3
+            '0.0': 95.0000,
+            '0.618': 102.3700,
+            '1.0': 105.0000,
+            '1.618': 109.5800
         },
-        "boll_upper": 103.50,
-        "boll_middle": 98.50,
-        "boll_lower": 93.50
+        "boll_upper": 103.5000,
+        "boll_middle": 98.5000,
+        "boll_lower": 93.5000
     }
 
     visualizer = ChartVisualizer()
@@ -189,12 +210,8 @@ if __name__ == "__main__":
 
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
-        print("👉 На графике теперь 8 линий:")
-        print("   🟢 SL (зелёный пунктир): $95.00")
-        print("   🔵 Entry (синяя сплошная): $98.00")
-        print("   🟠 TP1, TP2, TP3 (оранжевые/красные)")
-        print("   ⚪ Bollinger Bands: Верх, Сред, Низ (серые пунктирные)")
-        print("\n💡 Теперь TP на графике и в тексте совпадают, а Bollinger Bands добавлены для контекста!")
+        print("👉 Проверь заголовок графика: числа больше не заканчиваются на .0000!")
+        print("💡 Защита от ботов-хантеров активна.")
     else:
         print("\n❌ Ошибка при создании графика.")
 
