@@ -529,7 +529,7 @@ def main():
         if chart_path:
             post_text = generate_analysis_post(
                 best_coin['symbol'], best_coin['ta'], best_coin['patterns'], 
-                regime, final_macro_warning, best_coin['ql'], best_coin['qe"], best_coin['qd']
+                regime, final_macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd']
             )
             send_to_telegram(post_text, chart_path, best_coin['symbol'])
     else:
