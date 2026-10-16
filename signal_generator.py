@@ -46,16 +46,16 @@ SCAN_COINS = [
     "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
     "NEARUSDT", "UNIUSDT", "AAVEUSDT", "FETUSDT", "ARBUSDT",
     # Новые L1 / Классика (Высокая ликвидность)
-    "MATICUSDT", "ATOMUSDT", "LTCUSDT", "TRXUSDT", "XLMUSDT",
+    "TONUSDT", "ATOMUSDT", "LTCUSDT", "TRXUSDT", "XLMUSDT",
     "ETCUSDT", "BCHUSDT",
     # Новые L2 / Перспективные L1 (Хорошая волатильность)
-    "OPUSDT", "INJUSDT", "SUIUSDT", "SEIUSDT",
+    "OPUSDT", "INJUSDT", "APTUSDT", "SEIUSDT",
     # AI / Инфраструктура / Метавселенные
-    "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT",
+    "IMXUSDT", "FTMUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT",
     # DeFi Blue Chips
     "MKRUSDT", "RUNEUSDT",
     # Мемкоины с огромным объемом (отлично работают с PVT и Bollinger)
-    "SHIBUSDT", "PEPEUSDT", "WIFUSDT"
+    "SHIBUSDT", "FLOKIUSDT", "WIFUSDT"
 ]
 
 COINGECKO_IDS = {
@@ -66,13 +66,13 @@ COINGECKO_IDS = {
     "DOTUSDT": "polkadot", "NEARUSDT": "near", "UNIUSDT": "uniswap",
     "AAVEUSDT": "aave", "FETUSDT": "fetch-ai", "ARBUSDT": "arbitrum",
     # Новые
-    "MATICUSDT": "matic-network", "ATOMUSDT": "cosmos", "LTCUSDT": "litecoin",
+    "TONUSDT": "the-open-network", "ATOMUSDT": "cosmos", "LTCUSDT": "litecoin",
     "TRXUSDT": "tron", "XLMUSDT": "stellar", "ETCUSDT": "ethereum-classic",
     "BCHUSDT": "bitcoin-cash", "OPUSDT": "optimism", "INJUSDT": "injective-protocol",
-    "SUIUSDT": "sui", "SEIUSDT": "sei-network", "RNDRUSDT": "render-token",
-    "GRTUSDT": "the-graph", "FILUSDT": "filecoin", "SANDUSDT": "the-sandbox",
+    "APTUSDT": "aptos", "SEIUSDT": "sei-network", "IMXUSDT": "immutable-x",
+    "FTMUSDT": "fantom", "FILUSDT": "filecoin", "SANDUSDT": "the-sandbox",
     "MANAUSDT": "decentraland", "MKRUSDT": "maker", "RUNEUSDT": "thorchain",
-    "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe", "WIFUSDT": "dogwifcoin"
+    "SHIBUSDT": "shiba-inu", "FLOKIUSDT": "floki", "WIFUSDT": "dogwifcoin"
 }
 
 LAST_SIGNALS_FILE = "last_signals.json"
@@ -312,8 +312,8 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     weighted_rr = (0.4 * r1 + 0.3 * r2 + 0.3 * r3) / risk
     real_rr_value = round(weighted_rr, 2)
     
-    # 🚨 ФИНАЛЬНЫЙ ФИЛЬТР: Если реальный R:R слишком низкий, отменяем сигнал
-    if (not is_long and real_rr_value < 1.5) or (is_long and real_rr_value < 1.2):
+    # 🚨 ФИНАЛЬНЫЙ ФИЛЬТР: Пороги снижены для большей частоты сигналов во флэте
+    if (not is_long and real_rr_value < 1.3) or (is_long and real_rr_value < 1.0):
         logging.warning(f"⚠️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
         return None  # Возвращаем None, чтобы main() знал, что постить нельзя
 
@@ -395,7 +395,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
 • Обязательно используйте Stop Loss
-• Соотношение риск/прибыль должно быть ≥ 1:2 (текущее реальное: 1:{rr_value})
+• Соотношение риск/прибыль должно быть ≥ 1:1 (текущее реальное: 1:{rr_value})
 • При плече выше 3x даже хороший сигнал может привести к быстрой ликвидации — начинайте с 1x-2x
 
 📜 **ДИСКЛЕЙМЕР:**
