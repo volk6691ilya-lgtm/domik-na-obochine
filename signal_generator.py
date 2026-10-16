@@ -34,21 +34,17 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
 def check_binance_volume(symbol: str, min_volume_usdt: float = 50_000_000) -> bool:
     """
     Быстрая проверка суточного объема торгов через Binance API.
-    Возвращает True, если объем >= min_volume_usdt (по умолчанию $50 млн).
-    Экономит лимиты CMC API и отсекает неликвид.
     """
     try:
         url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            # quoteVolume - это объем торгов в валютe котировки (USDT)
             quote_vol = float(data.get('quoteVolume', 0))
             if quote_vol < min_volume_usdt:
                 return False
         return True
     except Exception:
-        # В случае ошибки сети не блокируем монету, пусть дальше проверяют другие фильтры
         return True
 
 BROWSER_HEADERS = {
@@ -58,26 +54,19 @@ BROWSER_HEADERS = {
     'Connection': 'keep-alive'
 }
 
-# ✅ ОПТИМИЗИРОВАННЫЙ СПИСОК ИЗ 40 ВЫСОКОЛИКВИДНЫХ МОНЕТ (ТОП-100 CMC)
 SCAN_COINS = [
-    # Ядро (Топ-20 по надежности и ликвидности)
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
     "ADAUSDT", "DOGEUSDT", "TRXUSDT", "AVAXUSDT", "LINKUSDT",
     "DOTUSDT", "LTCUSDT", "BCHUSDT", "NEARUSDT", "ATOMUSDT",
     "ETCUSDT", "XLMUSDT", "TONUSDT", "UNIUSDT", "AAVEUSDT",
-    # L2 и перспективные L1 (Высокая волатильность и объемы)
     "ARBUSDT", "OPUSDT", "INJUSDT", "APTUSDT", "SEIUSDT",
     "SUIUSDT", "IMXUSDT", "FTMUSDT",
-    # AI, Инфраструктура и Метавселенные
     "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT", "FETUSDT",
-    # DeFi Blue Chips
     "MKRUSDT", "RUNEUSDT",
-    # Мемкоины с гигантским объемом (отлично для Bollinger Squeeze)
     "SHIBUSDT", "PEPEUSDT", "FLOKIUSDT", "WIFUSDT"
 ]
 
 COINGECKO_IDS = {
-    # Ядро
     "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "BNBUSDT": "binancecoin",
     "SOLUSDT": "solana", "XRPUSDT": "ripple", "ADAUSDT": "cardano",
     "DOGEUSDT": "dogecoin", "TRXUSDT": "tron", "AVAXUSDT": "avalanche-2",
@@ -85,16 +74,12 @@ COINGECKO_IDS = {
     "BCHUSDT": "bitcoin-cash", "NEARUSDT": "near", "ATOMUSDT": "cosmos",
     "ETCUSDT": "ethereum-classic", "XLMUSDT": "stellar", "TONUSDT": "the-open-network",
     "UNIUSDT": "uniswap", "AAVEUSDT": "aave",
-    # L2 и L1
     "ARBUSDT": "arbitrum", "OPUSDT": "optimism", "INJUSDT": "injective-protocol",
     "APTUSDT": "aptos", "SEIUSDT": "sei-network", "SUIUSDT": "sui",
     "IMXUSDT": "immutable-x", "FTMUSDT": "fantom",
-    # AI, Инфраструктура, Метавселенные
     "RNDRUSDT": "render", "GRTUSDT": "the-graph", "FILUSDT": "filecoin",
     "SANDUSDT": "the-sandbox", "MANAUSDT": "decentraland", "FETUSDT": "fetch-ai",
-    # DeFi
     "MKRUSDT": "maker", "RUNEUSDT": "thorchain",
-    # Мемы
     "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe", "FLOKIUSDT": "floki", "WIFUSDT": "dogwifcoin"
 }
 
@@ -136,7 +121,7 @@ def is_duplicate_signal(symbol, direction):
 
 def get_historical_data_binance(symbol: str) -> pd.DataFrame:
     try:
-        time.sleep(0.5) # Немного уменьшил задержку для скорости
+        time.sleep(0.5)
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1h&limit=96"
         response = requests.get(url, headers=BROWSER_HEADERS, timeout=10)
         if response.status_code == 200:
@@ -172,7 +157,7 @@ def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
                     logging.info(f"✅ {symbol}: Получено {len(df)} свечей (1H) через Bybit")
                     return df
     except Exception as e:
-        logging.warning(f"⚠️ {symbol}: Bybit ошибка - {str(e)[:50]}")
+        logging.warning(f"️ {symbol}: Bybit ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
@@ -195,7 +180,7 @@ def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
                 logging.info(f"✅ {symbol}: Получено через CoinGecko (1H)")
                 return df
     except Exception as e:
-        logging.warning(f"⚠️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
+        logging.warning(f"️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
@@ -262,10 +247,24 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     
     strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
 
+    #  НОВОЕ: Проверка идеального Squeeze + конфлюэнса
+    bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
+    max_fib_confluence = ta_data.get('max_fib_confluence', 0)
+    bb_percent_b = ta_data.get('bb_percent_b', 0.5)
+    
+    # Экстремальное положение цены (%B < 0.1 или > 0.9)
+    bb_extreme = bb_percent_b < 0.1 or bb_percent_b > 0.9
+    
+    # Мощное подтверждение: Squeeze + Конфлюэнс + Объем
+    ultra_confirmation = bb_is_perfect_squeeze and max_fib_confluence >= 2 and volume_confirmed
+
+    # 🔒 ПОРОГИ С УЧЕТОМ ДОПОЛНИТЕЛЬНЫХ ПОДТВЕРЖДЕНИЙ
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
+    elif rr_value >= 0.9 and ultra_confirmation:
+        return ("high", "🟢", "Высоковероятный сигнал (Идеальный Squeeze + Конфлюэнс)")
     elif rr_value >= 0.9 and strong_confirmation:
-        return ("high", "🟢", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
+        return ("high", "", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
     elif rr_value >= 0.9 and volume_confirmed:
         return ("medium", "🟡", "Средняя вероятность")
     elif rr_value >= 1.3 and not volume_confirmed:
@@ -284,7 +283,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     
     is_long = "Бычий" in ta_data['trend']
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
-    direction_emoji = "🟢" if is_long else "🔴"
+    direction_emoji = "" if is_long else "🔴"
     
     entry = float(ta_data['entry'])
     sl = float(ta_data['sl'])
@@ -294,7 +293,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     risk = abs(entry - sl)
     
     if risk == 0:
-        logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
+        logging.warning(f"️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
         return None
     
     if is_long:
@@ -372,6 +371,18 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     tp2_fmt = get_anti_bot_price(tp2, symbol)
     tp3_fmt = get_anti_bot_price(tp3, symbol)
 
+    # 🎯 НОВОЕ: Формирование расширенного Bollinger статуса
+    bb_percent_b = ta_data.get('bb_percent_b', 0.5)
+    bb_width = ta_data.get('bb_width_percent', 0)
+    bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
+    max_fib_confluence = ta_data.get('max_fib_confluence', 0)
+    
+    boll_status_extended = ta_data.get('boll_status', 'Недоступно ⚪')
+    if bb_is_perfect_squeeze:
+        boll_status_extended += f" | %B: {bb_percent_b:.2f}, Width: {bb_width:.1f}%"
+    if max_fib_confluence >= 2:
+        boll_status_extended += f" |  Конфлюэнс: {max_fib_confluence} фактора"
+
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
@@ -379,7 +390,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
 • 🔵 **Точка входа (Entry):** ${entry_fmt:.4f}
-• 🟢 **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
+•  **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
 • 🔴 **Цели прибыли (TP):**
   - TP1: ${tp1_fmt:.4f} *(закрытие 40% позиции)*
   - TP2: ${tp2_fmt:.4f} *(закрытие еще 30%, итого 70%)*
@@ -393,7 +404,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 
 📉 **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
 • Тренд: {ta_data['trend']}
-• Bollinger Bands: {ta_data.get('boll_status', 'Недоступно ⚪')}
+• Bollinger Bands: {boll_status_extended}
 • Импульс: {ta_data['momentum']}
 • MACD: {ta_data['macd']}
 • Объем (PVT): {ta_data['volume_confirmed']}
@@ -402,12 +413,12 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 💡 **ОБОСНОВАНИЕ:**
 {justification}
 
-📋 **РЕКОМЕНДАЦИЯ:**
+ **РЕКОМЕНДАЦИЯ:**
 {rec}
 
 ⏱️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
 
-⚠️ **РИСК-МЕНЕДЖМЕНТ:**
+️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
 • Обязательно используйте Stop Loss
 • Соотношение риск/прибыль должно быть ≥ 1:1 (текущее реальное: 1:{rr_value})
@@ -519,7 +530,6 @@ def main():
     for coin in SCAN_COINS:
         logging.info(f"🔍 Анализ {coin}...")
         
-        # 🛡️ НОВОЕ: Быстрая проверка объема через Binance перед тяжелым анализом
         if not check_binance_volume(coin, min_volume_usdt=50_000_000):
             logging.info(f"⏸️ {coin}: Недостаточный суточный объем (< $50 млн). Пропускаем.")
             continue
@@ -550,10 +560,18 @@ def main():
             rr_value = 0.0
         
         if rr_value < 0.6:
-            logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
+            logging.info(f"️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
         score = rr_value + (0.4 if "Да ✅" in ta_data['volume_confirmed'] else 0)
+        
+        # 🎯 НОВОЕ: Бонус за идеальный Squeeze + конфлюэнс
+        bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
+        max_fib_confluence = ta_data.get('max_fib_confluence', 0)
+        if bb_is_perfect_squeeze and max_fib_confluence >= 2:
+            score += 0.3
+            logging.info(f"🔥 {coin}: Бонус +0.3 за Идеальный Squeeze + Конфлюэнс!")
+        
         logging.info(f"✅ {coin}: Score {score}")
         
         if score > best_score:
