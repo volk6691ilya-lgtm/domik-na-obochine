@@ -4,6 +4,7 @@ import numpy as np
 import logging
 import os
 import warnings
+import ta  # Добавлен импорт для расчета кривых Боллинджера
 
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
 
@@ -145,17 +146,25 @@ class ChartVisualizer:
                 hlines_colors.append('red')
                 hlines_styles.append('--')
 
-            # 6. BOLLINGER BANDS (Шаг 5: Визуализация)
-            if 'boll_upper' in ta_data and 'boll_middle' in ta_data and 'boll_lower' in ta_data:
-                hlines.append(float(ta_data['boll_upper']))
-                hlines_colors.append('gray')
-                hlines_styles.append('-.')
-                hlines.append(float(ta_data['boll_middle']))
-                hlines_colors.append('gray')
-                hlines_styles.append('--')
-                hlines.append(float(ta_data['boll_lower']))
-                hlines_colors.append('gray')
-                hlines_styles.append('-.')
+            # 🎨 6. BOLLINGER BANDS: Рисуем как ПЛАВАЮЩИЕ КРИВЫЕ, а не прямые линии!
+            add_plots = []
+            try:
+                # Рассчитываем полосы для ВСЕХ свечей в DataFrame
+                bollinger = ta.volatility.BollingerBands(close=df['close'], window=20, window_dev=2)
+                bb_upper = bollinger.bollinger_hband()
+                bb_middle = bollinger.bollinger_mavg()
+                bb_lower = bollinger.bollinger_lband()
+                
+                # Создаем addplot для кривых линий. 
+                # Цвет 'gray', тонкая линия (width=0.8) и прозрачность (alpha=0.7) делают их 
+                # отлично заметными как фон, но они не перебивают яркие линии Entry/SL/TP.
+                ap_upper = mpf.make_addplot(bb_upper, color='gray', linestyle='-.', width=0.8, alpha=0.7)
+                ap_middle = mpf.make_addplot(bb_middle, color='gray', linestyle='--', width=0.8, alpha=0.7)
+                ap_lower = mpf.make_addplot(bb_lower, color='gray', linestyle='-.', width=0.8, alpha=0.7)
+                
+                add_plots = [ap_upper, ap_middle, ap_lower]
+            except Exception as e:
+                logging.warning(f"⚠️ Не удалось построить кривые Bollinger Bands: {e}")
 
             # Настройки стиля графика (похож на TradingView)
             mc = mpf.make_marketcolors(up='g', down='r', edge='i', wick='i', volume='in', inherit=True)
@@ -175,6 +184,7 @@ class ChartVisualizer:
                 volume=True,
                 ylabel_lower='Volume',
                 hlines=dict(hlines=hlines, colors=hlines_colors, linestyle=hlines_styles),
+                addplot=add_plots if add_plots else None,  # <-- Добавляем кривые Боллинджера сюда
                 savefig=filepath,
                 figratio=(10, 6),
                 figscale=1.2
@@ -189,7 +199,7 @@ class ChartVisualizer:
 
 # Блок для локального тестирования
 if __name__ == "__main__":
-    print("\n--- Тест Chart Visualizer (с Anti-Bot Price и Bollinger Bands) ---")
+    print("\n--- Тест Chart Visualizer (с кривыми Bollinger Bands) ---")
 
     np.random.seed(42)
     dates = pd.date_range(end='2026-10-14', periods=50, freq='1h')
@@ -203,7 +213,7 @@ if __name__ == "__main__":
         'open': opens, 'high': highs, 'low': lows, 'close': closes, 'volume': volumes
     }, index=dates)
 
-    # Тестовые данные с "круглыми" числами, чтобы проверить работу функции
+    # Тестовые данные
     mock_ta_data = {
         "price": 98.0000,
         "entry": 98.0000,
@@ -217,10 +227,8 @@ if __name__ == "__main__":
             '0.618': 102.3700,
             '1.0': 105.0000,
             '1.618': 109.5800
-        },
-        "boll_upper": 103.5000,
-        "boll_middle": 98.5000,
-        "boll_lower": 93.5000
+        }
+        # boll_upper и т.д. больше не нужны для hlines, они посчитаются автоматически из df
     }
 
     visualizer = ChartVisualizer()
@@ -228,7 +236,7 @@ if __name__ == "__main__":
 
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
-        print("👉 Проверь заголовок графика: числа больше не заканчиваются на .0000!")
+        print("👉 Открой картинку: теперь Bollinger Bands нарисованы как плавные кривые линии!")
         print("💡 Защита от ботов-хантеров и логических ошибок TP активна.")
     else:
         print("\n❌ Ошибка при создании графика.")
