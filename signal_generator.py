@@ -210,13 +210,11 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     is_long = "Бычий" in ta_data.get('trend', '')
     
-    # Получаем статусы индикаторов для анализа конвергенции (Направление 2)
+    # Получаем статусы индикаторов для анализа конвергенции
     boll_status = ta_data.get('boll_status', '').lower()
     wr_status = ta_data.get('wr_status', '').lower()
     
     # Проверяем совпадение направления с Bollinger и WR
-    # Для лонга: цена у нижней полосы И WR в перепроданности
-    # Для шорта: цена у верхней полосы И WR в перекупленности
     bb_aligned = (is_long and "нижней" in boll_status) or (not is_long and "верхней" in boll_status)
     wr_aligned = (is_long and "перепроданн" in wr_status) or (not is_long and "перекупленн" in wr_status)
     
@@ -227,7 +225,6 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
     elif rr_value >= 0.9 and strong_confirmation:
-        # Бонус: R:R >= 0.9, но есть мощное подтверждение от BB, WR и объема
         return ("high", "🟢", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
     elif rr_value >= 0.9 and volume_confirmed:
         return ("medium", "🟡", "Средняя вероятность")
@@ -248,19 +245,31 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
     direction_emoji = "🟢" if is_long else "🔴"
     
-    entry = ta_data['entry']
-    sl = ta_data['sl']
-    tp = ta_data['tp']
+    entry = float(ta_data['entry'])
+    sl = float(ta_data['sl'])
+    tp = float(ta_data['tp'])
     fib_levels = ta_data.get('fib_levels', {})
     
+    # 🔧 ИСПРАВЛЕНИЕ: Расчет TP с жесткой проверкой логики (TP не может быть хуже Entry)
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
         tp3 = fib_levels.get('1.618', tp)
+        
+        # Проверка: для ЛОНГА цели должны быть СТРОГО ВЫШЕ входа
+        if tp1 <= entry: tp1 = round(entry + (tp - entry) * 0.4, 4)
+        if tp2 <= entry: tp2 = round(entry + (tp - entry) * 0.7, 4)
+        if tp3 <= entry: tp3 = tp
     else:
-        tp1 = fib_levels.get('0.618', round(entry - (entry - tp) * 0.4, 4))
-        tp2 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.7, 4))
-        tp3 = fib_levels.get('0.0', tp)
+        # Для ШОРТА берем более низкие уровни Фибоначчи
+        tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
+        tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
+        tp3 = fib_levels.get('-0.618', round(entry - (entry - tp) * 1.5, 4))
+        
+        # Проверка: для ШОРТА цели должны быть СТРОГО НИЖЕ входа
+        if tp1 >= entry: tp1 = round(entry - (entry - tp) * 0.4, 4)
+        if tp2 >= entry: tp2 = round(entry - (entry - tp) * 0.7, 4)
+        if tp3 >= entry: tp3 = round(entry - (entry - tp) * 1.5, 4)
     
     if sl > entry:
         sl_text = "вырастет выше"
@@ -291,12 +300,12 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
-    # 🔧 ИСПРАВЛЕНИЕ: Выровнен отступ. Теперь защита от круглых чисел применяется ВСЕГДА, а не только в else
-    entry_fmt = get_anti_bot_price(float(entry), symbol)
-    sl_fmt = get_anti_bot_price(float(sl), symbol)
-    tp1_fmt = get_anti_bot_price(float(tp1), symbol)
-    tp2_fmt = get_anti_bot_price(float(tp2), symbol)
-    tp3_fmt = get_anti_bot_price(float(tp3), symbol)
+    # Применяем защиту от круглых чисел ко всем уровням
+    entry_fmt = get_anti_bot_price(entry, symbol)
+    sl_fmt = get_anti_bot_price(sl, symbol)
+    tp1_fmt = get_anti_bot_price(tp1, symbol)
+    tp2_fmt = get_anti_bot_price(tp2, symbol)
+    tp3_fmt = get_anti_bot_price(tp3, symbol)
 
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
@@ -469,9 +478,9 @@ def main():
         except:
             rr_value = 0.0
         
-        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.6
+        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.6 (как в твоем текущем коде)
         if rr_value < 0.6:
-            logging.info(f"️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
+            logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
         score = rr_value + (0.4 if "Да ✅" in ta_data['volume_confirmed'] else 0)
@@ -486,7 +495,7 @@ def main():
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
             return
         
         logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
