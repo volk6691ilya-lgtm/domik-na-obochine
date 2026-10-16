@@ -157,7 +157,7 @@ def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
                     logging.info(f"✅ {symbol}: Получено {len(df)} свечей (1H) через Bybit")
                     return df
     except Exception as e:
-        logging.warning(f"️ {symbol}: Bybit ошибка - {str(e)[:50]}")
+        logging.warning(f"⚠️ {symbol}: Bybit ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
@@ -180,7 +180,7 @@ def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
                 logging.info(f"✅ {symbol}: Получено через CoinGecko (1H)")
                 return df
     except Exception as e:
-        logging.warning(f"️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
+        logging.warning(f"⚠️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
 def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
@@ -247,7 +247,7 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     
     strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
 
-    #  НОВОЕ: Проверка идеального Squeeze + конфлюэнса
+    # 🎯 НОВОЕ: Проверка идеального Squeeze + конфлюэнса
     bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
     max_fib_confluence = ta_data.get('max_fib_confluence', 0)
     bb_percent_b = ta_data.get('bb_percent_b', 0.5)
@@ -264,7 +264,7 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     elif rr_value >= 0.9 and ultra_confirmation:
         return ("high", "🟢", "Высоковероятный сигнал (Идеальный Squeeze + Конфлюэнс)")
     elif rr_value >= 0.9 and strong_confirmation:
-        return ("high", "", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
+        return ("high", "🟢", "Высоковероятный сигнал (подтверждено BB + WR + Объем)") # ИСПРАВЛЕНО: добавлен пропавший 🟢
     elif rr_value >= 0.9 and volume_confirmed:
         return ("medium", "🟡", "Средняя вероятность")
     elif rr_value >= 1.3 and not volume_confirmed:
@@ -283,7 +283,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     
     is_long = "Бычий" in ta_data['trend']
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
-    direction_emoji = "" if is_long else "🔴"
+    direction_emoji = "🟢" if is_long else "🔴" # ИСПРАВЛЕНО: добавлен пропавший 🟢 для лонга
     
     entry = float(ta_data['entry'])
     sl = float(ta_data['sl'])
@@ -293,7 +293,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     risk = abs(entry - sl)
     
     if risk == 0:
-        logging.warning(f"️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
+        logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
         return None
     
     if is_long:
@@ -381,7 +381,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     if bb_is_perfect_squeeze:
         boll_status_extended += f" | %B: {bb_percent_b:.2f}, Width: {bb_width:.1f}%"
     if max_fib_confluence >= 2:
-        boll_status_extended += f" |  Конфлюэнс: {max_fib_confluence} фактора"
+        boll_status_extended += f" | 🛡️ Конфлюэнс: {max_fib_confluence} фактора"
 
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
@@ -390,7 +390,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
 • 🔵 **Точка входа (Entry):** ${entry_fmt:.4f}
-•  **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
+• 🟢 **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
 • 🔴 **Цели прибыли (TP):**
   - TP1: ${tp1_fmt:.4f} *(закрытие 40% позиции)*
   - TP2: ${tp2_fmt:.4f} *(закрытие еще 30%, итого 70%)*
@@ -413,12 +413,12 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 💡 **ОБОСНОВАНИЕ:**
 {justification}
 
- **РЕКОМЕНДАЦИЯ:**
+📋 **РЕКОМЕНДАЦИЯ:**
 {rec}
 
 ⏱️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
 
-️ **РИСК-МЕНЕДЖМЕНТ:**
+⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
 • Обязательно используйте Stop Loss
 • Соотношение риск/прибыль должно быть ≥ 1:1 (текущее реальное: 1:{rr_value})
@@ -560,7 +560,7 @@ def main():
             rr_value = 0.0
         
         if rr_value < 0.6:
-            logging.info(f"️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
+            logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
         score = rr_value + (0.4 if "Да ✅" in ta_data['volume_confirmed'] else 0)
