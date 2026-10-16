@@ -427,18 +427,6 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
 def main():
     logging.info("🌙 Запуск Лунного Дозора v3.0 (1H таймфрейм, краткосрочные сигналы 4-8 часов)")
     
-    # 🕵️ ОПРЕДЕЛЯЕМ ТИП ЗАПУСКА через переменные окружения GitHub Actions
-    is_manual_run = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-    
-    if is_manual_run:
-        logging.info("🛠️ Обнаружен РУЧНОЙ запуск. Пороги фильтрации снижены для гарантированного результата.")
-        min_rr = 0.3          # Сниженный порог для ручного теста
-        allow_low = True      # Разрешаем низкое качество, если это лучшее, что есть
-    else:
-        logging.info("🤖 Обнаружен АВТОМАТИЧЕСКИЙ запуск. Включен строгий режим фильтрации (защита от спама).")
-        min_rr = 0.7          # Строгий порог для автономной работы
-        allow_low = False
-        
     health_checker = MarketHealthChecker()
     regime, _, _ = health_checker.get_market_regime()
     logging.info(f"Глобальный режим: {regime}")
@@ -452,7 +440,6 @@ def main():
     
     best_coin = None
     best_score = -1.0
-    fallback_coin = None # На случай, если рынок абсолютно мёртв даже для ручного запуска
     
     for coin in SCAN_COINS:
         logging.info(f"🔍 Анализ {coin}...")
@@ -469,68 +456,43 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
+        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: не отправляем сигналы низкого качества
+        if quality_level == "low":
+            logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
+            continue
+        
         try:
             rr_value = float(ta_data['estimated_R:R'].split(':')[1].strip().split()[0])
             if rr_value > 10.0:
                 rr_value = 1.0
+                logging.warning(f"⚠️ {coin}: Аномальный R:R в signal_generator, нормализован")
         except:
             rr_value = 0.0
         
-        # Сохраняем абсолютного лидера на случай тотального провала фильтров при ручном запуске
-        score = rr_value + (0.5 if "Да ✅" in ta_data['volume_confirmed'] else 0)
-        current_coin_data = {
-            "symbol": coin, "ta": ta_data, "patterns": pattern_data, "df": df, 
-            "ql": quality_level, "qe": quality_emoji, "qd": quality_desc, "score": score
-        }
-        
-        if fallback_coin is None or score > fallback_coin["score"]:
-            fallback_coin = current_coin_data
-
-        # Применяем фильтры в зависимости от режима
-        if not allow_low and quality_level == "low":
-            logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
-            continue
-            
-        if rr_value < min_rr:
-            logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
+        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.7
+        if rr_value < 0.6:
+            logging.info(f"️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
         
+        score = rr_value + (0.4 if "Да ✅" in ta_data['volume_confirmed'] else 0)
         logging.info(f"✅ {coin}: Score {score}")
         
         if score > best_score:
             best_score = score
-            best_coin = current_coin_data
+            best_coin = {"symbol": coin, "ta": ta_data, "patterns": pattern_data, "df": df, "ql": quality_level, "qe": quality_emoji, "qd": quality_desc}
     
-    # 🚨 ГАРАНТИЯ ВЫВОДА ПРИ РУЧНОМ ЗАПУСКЕ
-    if not best_coin and is_manual_run:
-        logging.warning("⚠️ Рынок мёртв. Даже мягкие фильтры ничего не нашли. Берём абсолютного лидера по Score для демонстрации работы системы.")
-        best_coin = fallback_coin
-        # Принудительно меняем описание, чтобы было понятно, что это вынужденная мера
-        best_coin["qd"] = "⚠️ ВЫНУЖДЕННЫЙ СИГНАЛ (Рынок во флэте, выбран лучший из худших для теста)"
-        best_coin["qe"] = "🟡"
-
     if best_coin:
         is_long = "Бычий" in best_coin['ta']['trend']
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            logging.info(f"️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
             return
         
         logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
-        
-        # Добавляем предупреждение в пост, если это ручной запуск
-        final_macro_warning = macro_warning
-        if is_manual_run:
-            test_warning = "⚠️ **ВНИМАНИЕ: РУЧНОЙ ТЕСТОВЫЙ ЗАПУСК!**\nПороги качества снижены для проверки работы индикаторов (Bollinger, Фибоначчи, Anti-Bot цены). Не используйте этот сигнал для реальной торговли без дополнительной проверки!\n\n"
-            final_macro_warning = test_warning + (macro_warning if macro_warning else "")
-        
         chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"signal_{best_coin['symbol']}.png")
         if chart_path:
-            post_text = generate_analysis_post(
-                best_coin['symbol'], best_coin['ta'], best_coin['patterns'], 
-                regime, final_macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd']
-            )
+            post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
             send_to_telegram(post_text, chart_path, best_coin['symbol'])
     else:
         logging.info("✅ Рынок во флэте или нет подходящих setups. Ни одна монета не прошла строгий фильтр качества. Сигналы не отправлены (капитал защищен).")
