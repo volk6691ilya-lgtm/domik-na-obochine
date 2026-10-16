@@ -258,9 +258,10 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     coin_name = symbol.replace('USDT', '')
     
     try:
-        rr_value = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
+        rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
+        initial_rr_value = float(rr_str)
     except:
-        rr_value = "N/A"
+        initial_rr_value = 1.0 # Дефолтное значение, будет перезаписано реальным расчетом
     
     is_long = "Бычий" in ta_data['trend']
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
@@ -271,33 +272,61 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     tp = float(ta_data['tp'])
     fib_levels = ta_data.get('fib_levels', {})
     
-    # 🔧 ИСПРАВЛЕНИЕ: Расчет TP с жесткой проверкой логики (TP не может быть хуже Entry)
+    # 🔧 ХИРУРГИЧЕСКАЯ ПРОВЕРКА: Гарантия математически выверенных целей
+    risk = abs(entry - sl)
+    
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
         tp3 = fib_levels.get('1.618', tp)
         
-        # Проверка: для ЛОНГА цели должны быть СТРОГО ВЫШЕ входа
-        if tp1 <= entry: tp1 = round(entry + (tp - entry) * 0.4, 4)
-        if tp2 <= entry: tp2 = round(entry + (tp - entry) * 0.7, 4)
-        if tp3 <= entry: tp3 = tp
+        if tp1 <= entry: tp1 = round(entry + (risk * 0.5), 4)
+        if tp2 <= entry: tp2 = round(entry + (risk * 1.0), 4)
+        if tp3 <= entry: tp3 = round(entry + (risk * 1.5), 4)
+        
+        # ГАРАНТИЯ: TP1 должен быть минимум на 50% расстояния риска от входа
+        if (tp1 - entry) < (risk * 0.5):
+            tp1 = round(entry + (risk * 0.5), 4)
     else:
-        # Для ШОРТА берем более низкие уровни Фибоначчи
         tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
         tp3 = fib_levels.get('-0.618', round(entry - (entry - tp) * 1.5, 4))
         
-        # Проверка: для ШОРТА цели должны быть СТРОГО НИЖЕ входа
-        if tp1 >= entry: tp1 = round(entry - (entry - tp) * 0.4, 4)
-        if tp2 >= entry: tp2 = round(entry - (entry - tp) * 0.7, 4)
-        if tp3 >= entry: tp3 = round(entry - (entry - tp) * 1.5, 4)
+        if tp3 == tp and '-0.618' not in fib_levels:
+            tp3 = round(entry - (entry - tp) * 1.5, 4)
+            
+        if tp1 >= entry: tp1 = round(entry - (risk * 0.5), 4)
+        if tp2 >= entry: tp2 = round(entry - (risk * 1.0), 4)
+        if tp3 >= entry: tp3 = round(entry - (risk * 1.5), 4)
+        
+        # ГАРАНТИЯ: TP1 должен быть минимум на 50% расстояния риска от входа
+        if (entry - tp1) < (risk * 0.5):
+            tp1 = round(entry - (risk * 0.5), 4)
+    
+    # 🧮 РАСЧЕТ РЕАЛЬНОГО ВЗВЕШЕННОГО R:R (40% на TP1, 30% на TP2, 30% на TP3)
+    if is_long:
+        r1, r2, r3 = tp1 - entry, tp2 - entry, tp3 - entry
+    else:
+        r1, r2, r3 = entry - tp1, entry - tp2, entry - tp3
+        
+    weighted_rr = (0.4 * r1 + 0.3 * r2 + 0.3 * r3) / risk
+    real_rr_value = round(weighted_rr, 2)
+    
+    # 🚨 ФИНАЛЬНЫЙ ФИЛЬТР: Если реальный R:R слишком низкий, отменяем сигнал
+    if (not is_long and real_rr_value < 1.5) or (is_long and real_rr_value < 1.2):
+        logging.warning(f"⚠️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
+        return None  # Возвращаем None, чтобы main() знал, что постить нельзя
+
+    # Используем реальный рассчитанный R:R для поста
+    rr_value = real_rr_value
     
     if sl > entry:
         sl_text = "вырастет выше"
     else:
         sl_text = "упадет ниже"
     
-    leverage = "3x-5x" if quality_level == "high" else "2x-3x"
+    # 🔧 БЕЗОПАСНОЕ ПЛЕЧО: Для новичков максимум 2x-3x даже для high сигналов
+    leverage = "2x-3x" if quality_level == "high" else "1x-2x"
     
     pattern_text = ', '.join(pattern_data['patterns'])
     has_bullish_pattern = any('Бычий' in p for p in pattern_data['patterns'])
@@ -366,7 +395,8 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
 • Обязательно используйте Stop Loss
-• Соотношение риск/прибыль должно быть ≥ 1:2 (текущее: 1:{rr_value})
+• Соотношение риск/прибыль должно быть ≥ 1:2 (текущее реальное: 1:{rr_value})
+• При плече выше 3x даже хороший сигнал может привести к быстрой ликвидации — начинайте с 1x-2x
 
 📜 **ДИСКЛЕЙМЕР:**
 ⚠️ Не является индивидуальной инвестиционной рекомендацией. Финансовые рынки сопряжены с риском потери средств. Проводите собственное исследование (DYOR)."""
@@ -499,7 +529,7 @@ def main():
         except:
             rr_value = 0.0
         
-        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.6 (как в твоем текущем коде)
+        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.6
         if rr_value < 0.6:
             logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
@@ -523,7 +553,10 @@ def main():
         chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"signal_{best_coin['symbol']}.png")
         if chart_path:
             post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
-            send_to_telegram(post_text, chart_path, best_coin['symbol'])
+            if post_text:  # <-- ДОБАВЛЕНА ПРОВЕРКА: если функция вернула None из-за плохого R:R, мы не отправляем пост
+                send_to_telegram(post_text, chart_path, best_coin['symbol'])
+            else:
+                logging.info(f"⏸️ {best_coin['symbol']}: Сигнал отклонен на этапе финальной математической проверки R:R.")
     else:
         logging.info("✅ Рынок во флэте или нет подходящих setups. Ни одна монета не прошла строгий фильтр качества. Сигналы не отправлены (капитал защищен).")
 
