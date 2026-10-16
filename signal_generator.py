@@ -19,8 +19,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 def get_anti_bot_price(price: float, symbol: str) -> float:
     """
     Гарантирует, что 4-й знак после запятой НИКОГДА не будет равен 0.
-    Добавляет детерминированный микро-сдвиг (0.0001 - 0.0009) на основе названия монеты,
-    чтобы уровни не выглядели как "круглые" числа для ботов-хантеров.
     """
     base_price = round(float(price), 4)
     last_digit = int(round(base_price * 10000)) % 10
@@ -33,6 +31,26 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
             
     return base_price
 
+def check_binance_volume(symbol: str, min_volume_usdt: float = 50_000_000) -> bool:
+    """
+    Быстрая проверка суточного объема торгов через Binance API.
+    Возвращает True, если объем >= min_volume_usdt (по умолчанию $50 млн).
+    Экономит лимиты CMC API и отсекает неликвид.
+    """
+    try:
+        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            # quoteVolume - это объем торгов в валютe котировки (USDT)
+            quote_vol = float(data.get('quoteVolume', 0))
+            if quote_vol < min_volume_usdt:
+                return False
+        return True
+    except Exception:
+        # В случае ошибки сети не блокируем монету, пусть дальше проверяют другие фильтры
+        return True
+
 BROWSER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -40,39 +58,44 @@ BROWSER_HEADERS = {
     'Connection': 'keep-alive'
 }
 
+# ✅ ОПТИМИЗИРОВАННЫЙ СПИСОК ИЗ 40 ВЫСОКОЛИКВИДНЫХ МОНЕТ (ТОП-100 CMC)
 SCAN_COINS = [
-    # Топ-15 (База)
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
-    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
-    "NEARUSDT", "UNIUSDT", "AAVEUSDT", "FETUSDT", "ARBUSDT",
-    # Новые L1 / Классика (Высокая ликвидность)
-    "TONUSDT", "ATOMUSDT", "LTCUSDT", "TRXUSDT", "XLMUSDT",
-    "ETCUSDT", "BCHUSDT",
-    # Новые L2 / Перспективные L1 (Хорошая волатильность)
-    "OPUSDT", "INJUSDT", "APTUSDT", "SEIUSDT",
-    # AI / Инфраструктура / Метавселенные
-    "IMXUSDT", "FTMUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT",
+    # Ядро (Топ-20 по надежности и ликвидности)
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "ADAUSDT", "DOGEUSDT", "TRXUSDT", "AVAXUSDT", "LINKUSDT",
+    "DOTUSDT", "LTCUSDT", "BCHUSDT", "NEARUSDT", "ATOMUSDT",
+    "ETCUSDT", "XLMUSDT", "TONUSDT", "UNIUSDT", "AAVEUSDT",
+    # L2 и перспективные L1 (Высокая волатильность и объемы)
+    "ARBUSDT", "OPUSDT", "INJUSDT", "APTUSDT", "SEIUSDT",
+    "SUIUSDT", "IMXUSDT", "FTMUSDT",
+    # AI, Инфраструктура и Метавселенные
+    "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT", "FETUSDT",
     # DeFi Blue Chips
     "MKRUSDT", "RUNEUSDT",
-    # Мемкоины с огромным объемом (отлично работают с PVT и Bollinger)
-    "SHIBUSDT", "FLOKIUSDT", "WIFUSDT"
+    # Мемкоины с гигантским объемом (отлично для Bollinger Squeeze)
+    "SHIBUSDT", "PEPEUSDT", "FLOKIUSDT", "WIFUSDT"
 ]
 
 COINGECKO_IDS = {
-    # Топ-15
-    "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana",
-    "BNBUSDT": "binancecoin", "XRPUSDT": "ripple", "ADAUSDT": "cardano",
-    "DOGEUSDT": "dogecoin", "AVAXUSDT": "avalanche-2", "LINKUSDT": "chainlink",
-    "DOTUSDT": "polkadot", "NEARUSDT": "near", "UNIUSDT": "uniswap",
-    "AAVEUSDT": "aave", "FETUSDT": "fetch-ai", "ARBUSDT": "arbitrum",
-    # Новые
-    "TONUSDT": "the-open-network", "ATOMUSDT": "cosmos", "LTCUSDT": "litecoin",
-    "TRXUSDT": "tron", "XLMUSDT": "stellar", "ETCUSDT": "ethereum-classic",
-    "BCHUSDT": "bitcoin-cash", "OPUSDT": "optimism", "INJUSDT": "injective-protocol",
-    "APTUSDT": "aptos", "SEIUSDT": "sei-network", "IMXUSDT": "immutable-x",
-    "FTMUSDT": "fantom", "FILUSDT": "filecoin", "SANDUSDT": "the-sandbox",
-    "MANAUSDT": "decentraland", "MKRUSDT": "maker", "RUNEUSDT": "thorchain",
-    "SHIBUSDT": "shiba-inu", "FLOKIUSDT": "floki", "WIFUSDT": "dogwifcoin"
+    # Ядро
+    "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "BNBUSDT": "binancecoin",
+    "SOLUSDT": "solana", "XRPUSDT": "ripple", "ADAUSDT": "cardano",
+    "DOGEUSDT": "dogecoin", "TRXUSDT": "tron", "AVAXUSDT": "avalanche-2",
+    "LINKUSDT": "chainlink", "DOTUSDT": "polkadot", "LTCUSDT": "litecoin",
+    "BCHUSDT": "bitcoin-cash", "NEARUSDT": "near", "ATOMUSDT": "cosmos",
+    "ETCUSDT": "ethereum-classic", "XLMUSDT": "stellar", "TONUSDT": "the-open-network",
+    "UNIUSDT": "uniswap", "AAVEUSDT": "aave",
+    # L2 и L1
+    "ARBUSDT": "arbitrum", "OPUSDT": "optimism", "INJUSDT": "injective-protocol",
+    "APTUSDT": "aptos", "SEIUSDT": "sei-network", "SUIUSDT": "sui",
+    "IMXUSDT": "immutable-x", "FTMUSDT": "fantom",
+    # AI, Инфраструктура, Метавселенные
+    "RNDRUSDT": "render", "GRTUSDT": "the-graph", "FILUSDT": "filecoin",
+    "SANDUSDT": "the-sandbox", "MANAUSDT": "decentraland", "FETUSDT": "fetch-ai",
+    # DeFi
+    "MKRUSDT": "maker", "RUNEUSDT": "thorchain",
+    # Мемы
+    "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe", "FLOKIUSDT": "floki", "WIFUSDT": "dogwifcoin"
 }
 
 LAST_SIGNALS_FILE = "last_signals.json"
@@ -113,7 +136,7 @@ def is_duplicate_signal(symbol, direction):
 
 def get_historical_data_binance(symbol: str) -> pd.DataFrame:
     try:
-        time.sleep(1)
+        time.sleep(0.5) # Немного уменьшил задержку для скорости
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1h&limit=96"
         response = requests.get(url, headers=BROWSER_HEADERS, timeout=10)
         if response.status_code == 200:
@@ -132,7 +155,7 @@ def get_historical_data_binance(symbol: str) -> pd.DataFrame:
 
 def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
     try:
-        time.sleep(1)
+        time.sleep(0.5)
         url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={symbol}&interval=60&limit=96"
         response = requests.get(url, headers=BROWSER_HEADERS, timeout=10)
         if response.status_code == 200:
@@ -231,18 +254,14 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     is_long = "Бычий" in ta_data.get('trend', '')
     
-    # Получаем статусы индикаторов для анализа конвергенции
     boll_status = ta_data.get('boll_status', '').lower()
     wr_status = ta_data.get('wr_status', '').lower()
     
-    # Проверяем совпадение направления с Bollinger и WR
     bb_aligned = (is_long and "нижней" in boll_status) or (not is_long and "верхней" in boll_status)
     wr_aligned = (is_long and "перепроданн" in wr_status) or (not is_long and "перекупленн" in wr_status)
     
-    # Мощное подтверждение: совпадение BB + WR + Объем
     strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
 
-    # 🔒 ПОРОГИ С УЧЕТОМ ДОПОЛНИТЕЛЬНЫХ ПОДТВЕРЖДЕНИЙ
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
     elif rr_value >= 0.9 and strong_confirmation:
@@ -261,7 +280,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
         initial_rr_value = float(rr_str)
     except:
-        initial_rr_value = 1.0 # Дефолтное значение, будет перезаписано реальным расчетом
+        initial_rr_value = 1.0
     
     is_long = "Бычий" in ta_data['trend']
     direction = "ЛОНГ (покупка)" if is_long else "ШОРТ (продажа)"
@@ -272,10 +291,8 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     tp = float(ta_data['tp'])
     fib_levels = ta_data.get('fib_levels', {})
     
-    # 🔧 ХИРУРГИЧЕСКАЯ ПРОВЕРКА: Гарантия математически выверенных целей
     risk = abs(entry - sl)
     
-    # 🛡️ ЗАЩИТА ОТ ДЕЛЕНИЯ НА НОЛЬ: Если Entry == SL, сделка не имеет смысла
     if risk == 0:
         logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
         return None
@@ -289,7 +306,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         if tp2 <= entry: tp2 = round(entry + (risk * 1.0), 4)
         if tp3 <= entry: tp3 = round(entry + (risk * 1.5), 4)
         
-        # ГАРАНТИЯ: TP1 должен быть минимум на 50% расстояния риска от входа
         if (tp1 - entry) < (risk * 0.5):
             tp1 = round(entry + (risk * 0.5), 4)
     else:
@@ -304,11 +320,9 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         if tp2 >= entry: tp2 = round(entry - (risk * 1.0), 4)
         if tp3 >= entry: tp3 = round(entry - (risk * 1.5), 4)
         
-        # ГАРАНТИЯ: TP1 должен быть минимум на 50% расстояния риска от входа
         if (entry - tp1) < (risk * 0.5):
             tp1 = round(entry - (risk * 0.5), 4)
     
-    # 🧮 РАСЧЕТ РЕАЛЬНОГО ВЗВЕШЕННОГО R:R (40% на TP1, 30% на TP2, 30% на TP3)
     if is_long:
         r1, r2, r3 = tp1 - entry, tp2 - entry, tp3 - entry
     else:
@@ -317,12 +331,10 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     weighted_rr = (0.4 * r1 + 0.3 * r2 + 0.3 * r3) / risk
     real_rr_value = round(weighted_rr, 2)
     
-    # 🚨 ФИНАЛЬНЫЙ ФИЛЬТР: Пороги снижены для большей частоты сигналов во флэте
     if (not is_long and real_rr_value < 1.1) or (is_long and real_rr_value < 1.0):
         logging.warning(f"⚠️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
-        return None  # Возвращаем None, чтобы main() знал, что постить нельзя
+        return None
 
-    # Используем реальный рассчитанный R:R для поста
     rr_value = real_rr_value
     
     if sl > entry:
@@ -330,7 +342,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         sl_text = "упадет ниже"
     
-    # 🔧 БЕЗОПАСНОЕ ПЛЕЧО: Для новичков максимум 2x-3x даже для high сигналов
     leverage = "2x-3x" if quality_level == "high" else "1x-2x"
     
     pattern_text = ', '.join(pattern_data['patterns'])
@@ -355,7 +366,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     else:
         rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
-    # Применяем защиту от круглых чисел ко всем уровням
     entry_fmt = get_anti_bot_price(entry, symbol)
     sl_fmt = get_anti_bot_price(sl, symbol)
     tp1_fmt = get_anti_bot_price(tp1, symbol)
@@ -508,6 +518,12 @@ def main():
     
     for coin in SCAN_COINS:
         logging.info(f"🔍 Анализ {coin}...")
+        
+        # 🛡️ НОВОЕ: Быстрая проверка объема через Binance перед тяжелым анализом
+        if not check_binance_volume(coin, min_volume_usdt=50_000_000):
+            logging.info(f"⏸️ {coin}: Недостаточный суточный объем (< $50 млн). Пропускаем.")
+            continue
+            
         df = get_historical_data(coin)
         if df.empty:
             continue
@@ -521,7 +537,6 @@ def main():
         pattern_data = pattern_recognizer.analyze_patterns(df)
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data)
         
-        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: не отправляем сигналы низкого качества
         if quality_level == "low":
             logging.info(f"⏸️ {coin}: Низкое качество сигнала. Пропускаем.")
             continue
@@ -534,7 +549,6 @@ def main():
         except:
             rr_value = 0.0
         
-        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.6
         if rr_value < 0.6:
             logging.info(f"⏸️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
@@ -558,7 +572,7 @@ def main():
         chart_path = visualizer.generate_signal_chart(best_coin['df'], best_coin['symbol'], best_coin['ta'], filename=f"signal_{best_coin['symbol']}.png")
         if chart_path:
             post_text = generate_analysis_post(best_coin['symbol'], best_coin['ta'], best_coin['patterns'], regime, macro_warning, best_coin['ql'], best_coin['qe'], best_coin['qd'])
-            if post_text:  # <-- ДОБАВЛЕНА ПРОВЕРКА: если функция вернула None из-за плохого R:R, мы не отправляем пост
+            if post_text:
                 send_to_telegram(post_text, chart_path, best_coin['symbol'])
             else:
                 logging.info(f"⏸️ {best_coin['symbol']}: Сигнал отклонен на этапе финальной математической проверки R:R.")
