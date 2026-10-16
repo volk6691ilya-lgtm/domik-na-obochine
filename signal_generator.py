@@ -41,17 +41,38 @@ BROWSER_HEADERS = {
 }
 
 SCAN_COINS = [
+    # Топ-15 (База)
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
     "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
-    "NEARUSDT", "UNIUSDT", "AAVEUSDT", "FETUSDT", "ARBUSDT"
+    "NEARUSDT", "UNIUSDT", "AAVEUSDT", "FETUSDT", "ARBUSDT",
+    # Новые L1 / Классика (Высокая ликвидность)
+    "MATICUSDT", "ATOMUSDT", "LTCUSDT", "TRXUSDT", "XLMUSDT",
+    "ETCUSDT", "BCHUSDT",
+    # Новые L2 / Перспективные L1 (Хорошая волатильность)
+    "OPUSDT", "INJUSDT", "SUIUSDT", "SEIUSDT",
+    # AI / Инфраструктура / Метавселенные
+    "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT",
+    # DeFi Blue Chips
+    "MKRUSDT", "RUNEUSDT",
+    # Мемкоины с огромным объемом (отлично работают с PVT и Bollinger)
+    "SHIBUSDT", "PEPEUSDT", "WIFUSDT"
 ]
 
 COINGECKO_IDS = {
+    # Топ-15
     "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana",
     "BNBUSDT": "binancecoin", "XRPUSDT": "ripple", "ADAUSDT": "cardano",
     "DOGEUSDT": "dogecoin", "AVAXUSDT": "avalanche-2", "LINKUSDT": "chainlink",
     "DOTUSDT": "polkadot", "NEARUSDT": "near", "UNIUSDT": "uniswap",
-    "AAVEUSDT": "aave", "FETUSDT": "fetch-ai", "ARBUSDT": "arbitrum"
+    "AAVEUSDT": "aave", "FETUSDT": "fetch-ai", "ARBUSDT": "arbitrum",
+    # Новые
+    "MATICUSDT": "matic-network", "ATOMUSDT": "cosmos", "LTCUSDT": "litecoin",
+    "TRXUSDT": "tron", "XLMUSDT": "stellar", "ETCUSDT": "ethereum-classic",
+    "BCHUSDT": "bitcoin-cash", "OPUSDT": "optimism", "INJUSDT": "injective-protocol",
+    "SUIUSDT": "sui", "SEIUSDT": "sei-network", "RNDRUSDT": "render-token",
+    "GRTUSDT": "the-graph", "FILUSDT": "filecoin", "SANDUSDT": "the-sandbox",
+    "MANAUSDT": "decentraland", "MKRUSDT": "maker", "RUNEUSDT": "thorchain",
+    "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe", "WIFUSDT": "dogwifcoin"
 }
 
 LAST_SIGNALS_FILE = "last_signals.json"
