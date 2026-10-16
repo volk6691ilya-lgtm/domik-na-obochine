@@ -51,7 +51,7 @@ class ChartVisualizer:
             tp_level = ta_data.get("tp") or ta_data.get("resistance_level (TP)")
             entry_level = ta_data.get("entry", ta_data.get("price", "N/A"))
 
-            # ✅ ИСПОЛЬЗУЕМ УРОВНИ ФИБОНАЧЧИ ИЗ TA_DATA (ШАГ 4)
+            # ✅ ИСПОЛЬЗУЕМ УРОВНИ ФИБОНАЧЧИ ИЗ TA_DATA С ПРОВЕРКОЙ ЛОГИКИ
             fib_levels = ta_data.get('fib_levels', {})
             
             # Определяем направление
@@ -64,15 +64,32 @@ class ChartVisualizer:
             
             if entry_level != "N/A" and fib_levels:
                 entry_float = float(entry_level)
+                tp_float = float(tp_level) if tp_level else entry_float
                 
                 if is_long:
-                    tp1 = fib_levels.get('0.618', round(entry_float + (float(tp_level) - entry_float) * 0.4, 4))
-                    tp2 = fib_levels.get('1.0', round(entry_float + (float(tp_level) - entry_float) * 0.7, 4))
-                    tp3 = fib_levels.get('1.618', float(tp_level))
+                    tp1 = fib_levels.get('0.618', round(entry_float + (tp_float - entry_float) * 0.4, 4))
+                    tp2 = fib_levels.get('1.0', round(entry_float + (tp_float - entry_float) * 0.7, 4))
+                    tp3 = fib_levels.get('1.618', tp_float)
+                    
+                    # 🔧 ПРОВЕРКА: для лонга TP должны быть СТРОГО ВЫШЕ входа
+                    if tp1 <= entry_float: tp1 = round(entry_float + (tp_float - entry_float) * 0.4, 4)
+                    if tp2 <= entry_float: tp2 = round(entry_float + (tp_float - entry_float) * 0.7, 4)
+                    if tp3 <= entry_float: tp3 = tp_float
                 else:
-                    tp1 = fib_levels.get('0.618', round(entry_float - (entry_float - float(tp_level)) * 0.4, 4))
-                    tp2 = fib_levels.get('0.382', round(entry_float - (entry_float - float(tp_level)) * 0.7, 4))
-                    tp3 = fib_levels.get('0.0', float(tp_level))
+                    # Для шорта берем более низкие уровни Фибоначчи
+                    tp1 = fib_levels.get('0.382', round(entry_float - (entry_float - tp_float) * 0.4, 4))
+                    tp2 = fib_levels.get('0.0', round(entry_float - (entry_float - tp_float) * 0.7, 4))
+                    tp3 = fib_levels.get('-0.618', round(entry_float - (entry_float - tp_float) * 1.5, 4))
+                    
+                    # Если уровня -0.618 нет, используем фоллбэк
+                    if tp3 == tp_float and '-0.618' not in fib_levels:
+                        tp3 = round(entry_float - (entry_float - tp_float) * 1.5, 4)
+                    
+                    # 🔧 ПРОВЕРКА: для шорта TP должны быть СТРОГО НИЖЕ входа
+                    if tp1 >= entry_float: tp1 = round(entry_float - (entry_float - tp_float) * 0.4, 4)
+                    if tp2 >= entry_float: tp2 = round(entry_float - (entry_float - tp_float) * 0.7, 4)
+                    if tp3 >= entry_float: tp3 = round(entry_float - (entry_float - tp_float) * 1.5, 4)
+                    
             elif entry_level != "N/A" and tp_level:
                 # Фоллбэк на старую логику, если Фибоначчи нет
                 entry_float = float(entry_level)
@@ -85,7 +102,7 @@ class ChartVisualizer:
                 else:
                     tp1 = round(entry_float - (entry_float - tp_float) * 0.4, 4)
                     tp2 = round(entry_float - (entry_float - tp_float) * 0.7, 4)
-                    tp3 = tp_float
+                    tp3 = round(entry_float - (entry_float - tp_float) * 1.5, 4)
 
             # 🛡️ ПРИМЕНЯЕМ ЗАЩИТУ ОТ КРУГЛЫХ ЧИСЕЛ (Anti-Bot Price)
             entry_fmt = get_anti_bot_price(float(entry_level), symbol) if entry_level != "N/A" else 0.0
@@ -196,6 +213,7 @@ if __name__ == "__main__":
         "estimated_R:R": "1 : 2.5",
         "fib_levels": {
             '0.0': 95.0000,
+            '0.382': 99.6500,
             '0.618': 102.3700,
             '1.0': 105.0000,
             '1.618': 109.5800
@@ -211,7 +229,7 @@ if __name__ == "__main__":
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен по пути: {os.path.abspath(filepath)}")
         print("👉 Проверь заголовок графика: числа больше не заканчиваются на .0000!")
-        print("💡 Защита от ботов-хантеров активна.")
+        print("💡 Защита от ботов-хантеров и логических ошибок TP активна.")
     else:
         print("\n❌ Ошибка при создании графика.")
 
