@@ -469,7 +469,7 @@ def main():
         except:
             rr_value = 0.0
         
-        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.7
+        # 🔒 СТРОГАЯ ФИЛЬТРАЦИЯ: R:R должен быть >= 0.6
         if rr_value < 0.6:
             logging.info(f"️ {coin}: R:R слишком низкий ({rr_value}). Пропускаем.")
             continue
