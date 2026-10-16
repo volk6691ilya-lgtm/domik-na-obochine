@@ -275,6 +275,11 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     # 🔧 ХИРУРГИЧЕСКАЯ ПРОВЕРКА: Гарантия математически выверенных целей
     risk = abs(entry - sl)
     
+    # 🛡️ ЗАЩИТА ОТ ДЕЛЕНИЯ НА НОЛЬ: Если Entry == SL, сделка не имеет смысла
+    if risk == 0:
+        logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
+        return None
+    
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
@@ -366,9 +371,9 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 • 🔵 **Точка входа (Entry):** ${entry_fmt:.4f}
 • 🟢 **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
 • 🔴 **Цели прибыли (TP):**
-  - TP1: ${tp1_fmt:.4f} *(фиксация 40% прибыли)*
-  - TP2: ${tp2_fmt:.4f} *(фиксация 70% прибыли)*
-  - TP3: ${tp3_fmt:.4f} *(полная цель)*
+  - TP1: ${tp1_fmt:.4f} *(закрытие 40% позиции)*
+  - TP2: ${tp2_fmt:.4f} *(закрытие еще 30%, итого 70%)*
+  - TP3: ${tp3_fmt:.4f} *(закрытие остатка, полная цель)*
 • **Плечо:** {leverage} *(безопасно для новичков)*
 • Соотношение Риск/Прибыль: **1:{rr_value}**
 
