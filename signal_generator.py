@@ -318,7 +318,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     real_rr_value = round(weighted_rr, 2)
     
     # 🚨 ФИНАЛЬНЫЙ ФИЛЬТР: Пороги снижены для большей частоты сигналов во флэте
-    if (not is_long and real_rr_value < 1.3) or (is_long and real_rr_value < 1.0):
+    if (not is_long and real_rr_value < 1.1) or (is_long and real_rr_value < 1.0):
         logging.warning(f"⚠️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
         return None  # Возвращаем None, чтобы main() знал, что постить нельзя
 
