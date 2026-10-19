@@ -55,32 +55,64 @@ BROWSER_HEADERS = {
 }
 
 SCAN_COINS = [
+    # Ядро (Топ-15)
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
     "ADAUSDT", "DOGEUSDT", "TRXUSDT", "AVAXUSDT", "LINKUSDT",
     "DOTUSDT", "LTCUSDT", "BCHUSDT", "NEARUSDT", "ATOMUSDT",
-    "ETCUSDT", "XLMUSDT", "TONUSDT", "UNIUSDT", "AAVEUSDT",
+    
+    # L2 и перспективные L1
     "ARBUSDT", "OPUSDT", "INJUSDT", "APTUSDT", "SEIUSDT",
-    "SUIUSDT", "IMXUSDT", "FTMUSDT",
-    "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT", "FETUSDT",
-    "MKRUSDT", "RUNEUSDT",
+    "SUIUSDT", "IMXUSDT", "FTMUSDT", "TONUSDT",
+    
+    # AI, Инфраструктура и Метавселенные
+    "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT", 
+    "FETUSDT", "THETAUSDT", "ICPUSDT",
+    
+    # DeFi Blue Chips
+    "AAVEUSDT", "UNIUSDT", "MKRUSDT", "RUNEUSDT",
+    "COMPUSDT", "JUPUSDT", "GTCUSDT",
+    
+    # Новые перспективные (со скриншотов)
+    "ONDOUSDT", "BLURUSDT", "ENAUSDT", "TIAUSDT",
+    "ZECUSDT", "WLDUSDT", "PUMPUSDT", "HYPEUSDT", "FARTCOINUSDT",
+    
+    # Мемкоины с объемом
     "SHIBUSDT", "PEPEUSDT", "FLOKIUSDT", "WIFUSDT"
 ]
 
 COINGECKO_IDS = {
+    # Ядро
     "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "BNBUSDT": "binancecoin",
     "SOLUSDT": "solana", "XRPUSDT": "ripple", "ADAUSDT": "cardano",
     "DOGEUSDT": "dogecoin", "TRXUSDT": "tron", "AVAXUSDT": "avalanche-2",
     "LINKUSDT": "chainlink", "DOTUSDT": "polkadot", "LTCUSDT": "litecoin",
     "BCHUSDT": "bitcoin-cash", "NEARUSDT": "near", "ATOMUSDT": "cosmos",
-    "ETCUSDT": "ethereum-classic", "XLMUSDT": "stellar", "TONUSDT": "the-open-network",
-    "UNIUSDT": "uniswap", "AAVEUSDT": "aave",
+    
+    # L2 и L1
     "ARBUSDT": "arbitrum", "OPUSDT": "optimism", "INJUSDT": "injective-protocol",
     "APTUSDT": "aptos", "SEIUSDT": "sei-network", "SUIUSDT": "sui",
-    "IMXUSDT": "immutable-x", "FTMUSDT": "fantom",
+    "IMXUSDT": "immutable-x", "FTMUSDT": "fantom", "TONUSDT": "the-open-network",
+    
+    # AI, Инфраструктура, Метавселенные
     "RNDRUSDT": "render", "GRTUSDT": "the-graph", "FILUSDT": "filecoin",
     "SANDUSDT": "the-sandbox", "MANAUSDT": "decentraland", "FETUSDT": "fetch-ai",
-    "MKRUSDT": "maker", "RUNEUSDT": "thorchain",
-    "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe", "FLOKIUSDT": "floki", "WIFUSDT": "dogwifcoin"
+    "THETAUSDT": "theta-token", "ICPUSDT": "internet-computer",
+    
+    # DeFi
+    "AAVEUSDT": "aave", "UNIUSDT": "uniswap", "MKRUSDT": "maker", 
+    "RUNEUSDT": "thorchain", "COMPUSDT": "compound-governance-token",
+    "JUPUSDT": "jupiter-exchange-solana", "GTCUSDT": "gitcoin",
+    
+    # Новые перспективные
+    "ONDOUSDT": "ondo-finance", "BLURUSDT": "blur", 
+    "ENAUSDT": "ethena", "TIAUSDT": "celestia",
+    "ZECUSDT": "zcash", "WLDUSDT": "worldcoin-wld",
+    "PUMPUSDT": "pump-fun", "HYPEUSDT": "hyperliquid",
+    "FARTCOINUSDT": "fartcoin",
+    
+    # Мемы
+    "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe", 
+    "FLOKIUSDT": "floki", "WIFUSDT": "dogwifcoin"
 }
 
 LAST_SIGNALS_FILE = "last_signals.json"
