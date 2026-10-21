@@ -2,7 +2,9 @@ import pandas as pd
 import ta
 import numpy as np
 import logging
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 class TAEngine:
     def __init__(self):
@@ -24,9 +26,9 @@ class TAEngine:
             try:
                 ema_indicator = ta.trend.EMAIndicator(close=df['close'], window=self.ema_length)
                 ema_50 = float(ema_indicator.ema_indicator().iloc[-1])
-                trend = "Бычий  (Цена > EMA50)" if current_price > ema_50 else "Медвежий 🔴 (Цена < EMA50)"
+                trend = "Бычий 🟢 (Цена > EMA50)" if current_price > ema_50 else "Медвежий 🔴 (Цена < EMA50)"
             except Exception:
-                trend = "Нейтрально ⚪ (EMA недоступен)"
+                trend = "Нейтрально  (EMA недоступен)"
                 ema_50 = current_price
 
             # 2. ИМПУЛЬС (RSI + StochRSI)
@@ -49,13 +51,13 @@ class TAEngine:
             # 3. MACD
             try:
                 macd_indicator = ta.trend.MACD(
-                    close=df['close'], window_slow=self.macd_slow, 
+                    close=df['close'], window_slow=self.macd_slow,
                     window_fast=self.macd_fast, window_sign=self.macd_signal
                 )
                 macd_hist = float(macd_indicator.macd_diff().iloc[-1])
                 macd_signal_text = "Рост импульса 📈" if macd_hist > 0 else "Падение импульса 📉"
             except Exception:
-                macd_signal_text = "Нейтрально ⚪ (MACD недоступен)"
+                macd_signal_text = "Нейтрально  (MACD недоступен)"
 
             # 4. PVT (Price Volume Trend)
             try:
@@ -98,14 +100,14 @@ class TAEngine:
                 elif wr14 > -20 and wr21 > -20:
                     wr_status = "Оба WR в перекупленности (сигнал на продажу) 🔴"
                 elif wr14 < -80:
-                    wr_status = "WR14 в перепроданности (потенциальный отскок) 🟢"
+                    wr_status = "WR14 в перепроданности (потенциальный отскок) "
                 elif wr21 < -80:
                     wr_status = "WR21 в перепроданности (потенциальный отскок) 🟡"
                 else:
-                    wr_status = "WR в нейтральной зоне ⚪"
+                    wr_status = "WR в нейтральной зоне "
             except Exception:
                 wr14, wr21 = -50.0, -50.0
-                wr_status = "Недоступно "
+                wr_status = "Недоступно ⚪"
 
             # 7. УРОВНИ SL/TP
             recent_lows = float(df['low'].iloc[-48:].min())
@@ -123,6 +125,7 @@ class TAEngine:
                 entry_level = max(current_price, (recent_lows + recent_highs) / 2)
                 if current_price < ema_50:
                     entry_level = min(ema_50, recent_highs - (recent_highs - recent_lows) * 0.3)
+
             risk = abs(current_price - sl_level)
             reward = abs(tp_level - current_price)
             rr_ratio = round(reward / risk, 2) if risk > 0 else 0.0
@@ -131,7 +134,7 @@ class TAEngine:
                 logging.warning(f"⚠️ Аномальный R:R ({rr_ratio}), нормализован до 1.0")
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
-            # 8. BOLLINGER BANDS + SQUEEZE + %B + WIDTH (ПРИОРИТЕТ 1)
+            # 8. BOLLINGER BANDS — ТОЛЬКО ДЛЯ ОТРИСОВКИ И ПРОСТОГО СТАТУСА
             try:
                 bollinger = ta.volatility.BollingerBands(
                     close=df['close'], window=20, window_dev=2
@@ -139,53 +142,20 @@ class TAEngine:
                 boll_upper = float(bollinger.bollinger_hband().iloc[-1])
                 boll_middle = float(bollinger.bollinger_mavg().iloc[-1])
                 boll_lower = float(bollinger.bollinger_lband().iloc[-1])
-                
-                # Определяем положение цены
+
+                # Простой статус без предсказаний
                 if current_price <= boll_lower:
                     boll_status = "У нижней полосы (перепроданность) 🟢"
                 elif current_price >= boll_upper:
-                    boll_status = "У верхней полосы (перекупленность) 🔴"
+                    boll_status = "У верхней полосы (перекупленность) "
                 else:
                     boll_status = "Внутри полос (нейтрально) ⚪"
-                
-                # 🔍 НАПРАВЛЕНИЕ 3: Определяем Bollinger Squeeze
-                current_width = boll_upper - boll_lower
-                boll_upper_series = bollinger.bollinger_hband().iloc[-20:]
-                boll_lower_series = bollinger.bollinger_lband().iloc[-20:]
-                historical_width = (boll_upper_series - boll_lower_series).mean()
-                
-                # 🎯 НОВОЕ: Расчет %B (Percent B)
-                bb_percent_b = (current_price - boll_lower) / (boll_upper - boll_lower) if (boll_upper - boll_lower) > 0 else 0.5
-                
-                # 🎯 НОВОЕ: Расчет ширины канала в %
-                bb_width_percent = (current_width / boll_middle * 100) if boll_middle > 0 else 0
-                
-                # 🎯 НОВОЕ: Проверка "Идеального Squeeze" (width < 70% от средней)
-                bb_is_perfect_squeeze = current_width < (historical_width * 0.7)
-                
-                if current_width < historical_width * 0.8:
-                    squeeze_warning = " Сужение канала (Squeeze)! Ожидается пробой. "
-                    boll_status = squeeze_warning + boll_status
-                    logging.info(f" Bollinger Squeeze detected! Width: {current_width:.2f}, Avg: {historical_width:.2f}")
-                
-                if bb_is_perfect_squeeze:
-                    logging.info(f"🔥 ИДЕАЛЬНЫЙ SQUEEZE! Width: {bb_width_percent:.2f}%, %B: {bb_percent_b:.3f}")
-                    
+
             except Exception:
                 boll_upper, boll_middle, boll_lower = 0, 0, 0
-                boll_status = "Недоступно ⚪"
-                bb_percent_b = 0.5
-                bb_width_percent = 0
-                bb_is_perfect_squeeze = False
+                boll_status = "Недоступно "
 
-            #  НОВОЕ: Расчет SMA 200 для конфлюэнса
-            try:
-                sma_200_indicator = ta.trend.SMAIndicator(close=df['close'], window=200)
-                sma_200 = float(sma_200_indicator.sma_indicator().iloc[-1])
-            except Exception:
-                sma_200 = None
-
-            # 9. УРОВНИ ФИБОНАЧЧИ + КОНФЛЮЭНС (ПРИОРИТЕТ 2)
+            # 9. УРОВНИ ФИБОНАЧЧИ (для расчёта TP в signal_generator)
             try:
                 recent_high = float(df['high'].iloc[-48:].max())
                 recent_low = float(df['low'].iloc[-48:].min())
@@ -202,36 +172,9 @@ class TAEngine:
                     '2.618': round(recent_low + diff * 2.618, 4)
                 }
                 fib_status = f"Диапазон: ${fib_levels['0.0']} - ${fib_levels['1.0']}"
-                
-                # 🎯 НОВОЕ: Функция проверки конфлюэнса
-                def check_fib_confluence(fib_level, current_price, sma_200, boll_middle):
-                    score = 0
-                    # 1. Проверка круглого числа
-                    if fib_level % 100 < 5 or fib_level % 100 > 95:
-                        score += 1
-                    elif fib_level % 50 < 3 or fib_level % 50 > 47:
-                        score += 1
-                    # 2. Проверка совпадения с SMA 200 (в пределах 0.5%)
-                    if sma_200 and abs(fib_level - sma_200) / sma_200 < 0.005:
-                        score += 1
-                    # 3. Проверка совпадения с серединой Боллинджера (SMA 20)
-                    if boll_middle and abs(fib_level - boll_middle) / boll_middle < 0.005:
-                        score += 1
-                    return score
-                
-                # Рассчитываем конфлюэнс для ключевых уровней
-                fib_confluence = {}
-                for key, level in fib_levels.items():
-                    fib_confluence[key] = check_fib_confluence(level, current_price, sma_200, boll_middle)
-                
-                # Максимальный конфлюэнс среди всех уровней
-                max_fib_confluence = max(fib_confluence.values()) if fib_confluence else 0
-                
             except Exception:
                 fib_levels = {}
                 fib_status = "Фибоначчи недоступен"
-                fib_confluence = {}
-                max_fib_confluence = 0
 
             # ЧИСТЫЙ ВОЗВРАТ ДАННЫХ
             return {
@@ -251,14 +194,8 @@ class TAEngine:
                 "boll_middle": round(boll_middle, 4),
                 "boll_lower": round(boll_lower, 4),
                 "boll_status": boll_status,
-                "bb_percent_b": round(bb_percent_b, 3),  # НОВОЕ
-                "bb_width_percent": round(bb_width_percent, 2),  # НОВОЕ
-                "bb_is_perfect_squeeze": bb_is_perfect_squeeze,  # НОВОЕ
-                "sma_200": round(sma_200, 4) if sma_200 else None,  # НОВОЕ
                 "fib_levels": fib_levels,
                 "fib_status": fib_status,
-                "fib_confluence": fib_confluence,  # НОВОЕ
-                "max_fib_confluence": max_fib_confluence,  # НОВОЕ
                 "wr14": round(wr14, 2),
                 "wr21": round(wr21, 2),
                 "wr_status": wr_status
