@@ -1,4 +1,4 @@
-name: Fire Spy Main Run
+name: Main Run
 
 on:
   # schedule:
