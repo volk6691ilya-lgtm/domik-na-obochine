@@ -1,10 +1,9 @@
 name: Fire Spy Main Run
 
 on:
-  schedule:
-    # 09:12 и 21:12 МСК (UTC = МСК - 3 часа). Сдвиг на 12 мин помогает избежать очередей GitHub.
-    # Раскомментируйте строки ниже, когда будете готовы к автоматическому запуску
-    # - cron: '12 6,18 * * *'
+  # schedule:
+  #  # 09:12 и 21:12 МСК (UTC = МСК - 3 часа). Сдвиг на 12 мин помогает избежать очередей GitHub.
+  #   - cron: '12 6,18 * * *'
   workflow_dispatch: # Позволяет запускать вручную из вкладки Actions
 
 jobs:
@@ -22,8 +21,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Добавлены все необходимые библиотеки для TA Engine и Visualizer
-          pip install yfinance requests feedparser pandas matplotlib ta scipy mplfinance numpy python-dotenv
+          # ДОБАВЛЕНЫ ВСЕ НЕОБХОДИМЫЕ БИБЛИОТЕКИ, включая six, ta, scipy, mplfinance
+          pip install yfinance requests feedparser pandas matplotlib ta scipy mplfinance numpy python-dotenv six
           
       - name: Run Signal Generator
         run: python signal_generator.py
@@ -31,4 +30,4 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
-          # OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }} # Оставьте, если используется в других частях кода
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }} # Оставлен, если используется в других частях кода
