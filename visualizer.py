@@ -62,22 +62,22 @@ class ChartVisualizer:
                     tp2 = fib_levels.get('1.0', round(entry_float + (tp_float - entry_float) * 0.7, 4))
                     tp3 = fib_levels.get('1.618', tp_float)
                     
-                    # 🔧 РЕАЛИСТИЧНЫЕ ОГРАНИЧЕНИЯ для 1H таймфрейма (синхронизация с signal_generator.py)
-                    # TP1: минимум R:R 0.8
-                    if tp1 <= entry_float or (tp1 - entry_float) < (risk * 0.8):
-                        tp1 = round(entry_float + (risk * 0.8), 4)
+                    # 🔧 СВЕРХРЕАЛИСТИЧНЫЕ ОГРАНИЧЕНИЯ для 1H таймфрейма (синхронизация с signal_generator.py)
+                    # TP1: минимум R:R 0.7
+                    if tp1 <= entry_float or (tp1 - entry_float) < (risk * 0.7):
+                        tp1 = round(entry_float + (risk * 0.7), 4)
                     
-                    # TP2: максимум R:R 1.5
+                    # TP2: максимум R:R 1.2
                     if tp2 <= entry_float:
-                        tp2 = round(entry_float + (risk * 1.5), 4)
-                    elif (tp2 - entry_float) > (risk * 1.5):
-                        tp2 = round(entry_float + (risk * 1.5), 4)
+                        tp2 = round(entry_float + (risk * 1.2), 4)
+                    elif (tp2 - entry_float) > (risk * 1.2):
+                        tp2 = round(entry_float + (risk * 1.2), 4)
                     
-                    # TP3: максимум R:R 2.2
+                    # TP3: максимум R:R 1.7
                     if tp3 <= entry_float:
-                        tp3 = round(entry_float + (risk * 2.2), 4)
-                    elif (tp3 - entry_float) > (risk * 2.2):
-                        tp3 = round(entry_float + (risk * 2.2), 4)
+                        tp3 = round(entry_float + (risk * 1.7), 4)
+                    elif (tp3 - entry_float) > (risk * 1.7):
+                        tp3 = round(entry_float + (risk * 1.7), 4)
                         
                 else:
                     tp1 = fib_levels.get('0.382', round(entry_float - (entry_float - tp_float) * 0.4, 4))
@@ -87,19 +87,19 @@ class ChartVisualizer:
                     if tp3 == tp_float and '-0.618' not in fib_levels:
                         tp3 = round(entry_float - (entry_float - tp_float) * 1.5, 4)
                     
-                    #  РЕАЛИСТИЧНЫЕ ОГРАНИЧЕНИЯ для шорта
-                    if tp1 >= entry_float or (entry_float - tp1) < (risk * 0.8):
-                        tp1 = round(entry_float - (risk * 0.8), 4)
+                    # РЕАЛИСТИЧНЫЕ ОГРАНИЧЕНИЯ для шорта
+                    if tp1 >= entry_float or (entry_float - tp1) < (risk * 0.7):
+                        tp1 = round(entry_float - (risk * 0.7), 4)
                     
                     if tp2 >= entry_float:
-                        tp2 = round(entry_float - (risk * 1.5), 4)
-                    elif (entry_float - tp2) > (risk * 1.5):
-                        tp2 = round(entry_float - (risk * 1.5), 4)
+                        tp2 = round(entry_float - (risk * 1.2), 4)
+                    elif (entry_float - tp2) > (risk * 1.2):
+                        tp2 = round(entry_float - (risk * 1.2), 4)
                     
                     if tp3 >= entry_float:
-                        tp3 = round(entry_float - (risk * 2.2), 4)
-                    elif (entry_float - tp3) > (risk * 2.2):
-                        tp3 = round(entry_float - (risk * 2.2), 4)
+                        tp3 = round(entry_float - (risk * 1.7), 4)
+                    elif (entry_float - tp3) > (risk * 1.7):
+                        tp3 = round(entry_float - (risk * 1.7), 4)
                         
             elif entry_level != "N/A" and tp_level:
                 entry_float = float(entry_level)
@@ -107,13 +107,13 @@ class ChartVisualizer:
                 risk = abs(entry_float - float(sl_level)) if sl_level else abs(entry_float - tp_float) * 0.5
                 
                 if is_long:
-                    tp1 = round(entry_float + (risk * 0.8), 4)
-                    tp2 = round(entry_float + (risk * 1.5), 4)
-                    tp3 = round(entry_float + (risk * 2.2), 4)
+                    tp1 = round(entry_float + (risk * 0.7), 4)
+                    tp2 = round(entry_float + (risk * 1.2), 4)
+                    tp3 = round(entry_float + (risk * 1.7), 4)
                 else:
-                    tp1 = round(entry_float - (risk * 0.8), 4)
-                    tp2 = round(entry_float - (risk * 1.5), 4)
-                    tp3 = round(entry_float - (risk * 2.2), 4)
+                    tp1 = round(entry_float - (risk * 0.7), 4)
+                    tp2 = round(entry_float - (risk * 1.2), 4)
+                    tp3 = round(entry_float - (risk * 1.7), 4)
 
             # Применяем защиту от круглых чисел
             entry_fmt = get_anti_bot_price(float(entry_level), symbol) if entry_level != "N/A" else 0.0
@@ -236,7 +236,7 @@ if __name__ == "__main__":
 
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен: {os.path.abspath(filepath)}")
-        print("👉 TP на графике теперь синхронизированы с постом (R:R 0.8/1.5/2.2)")
+        print("👉 TP на графике теперь синхронизированы с постом (R:R 0.7/1.2/1.7)")
     else:
         print("\n❌ Ошибка при создании графика.")
 
