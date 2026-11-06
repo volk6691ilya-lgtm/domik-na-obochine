@@ -3,39 +3,33 @@ name: Advanced Trading Signals
 on:
   # schedule:
   #   # 02:16, 06:16, 11:16, 15:16, 19:16, 22:16, 23:16 МСК (UTC = МСК - 3 часа)
-  #   # Сдвиг на 16 мин помогает избежать очередей GitHub на ровном часе.
+  #   # Сдвиг на 16 мин помогает избежать очередей GitHub.
+  #   # РАСКОММЕНТИРУЙ ПОСЛЕ ПОКУПКИ GITHUB PRO:
   #   - cron: '16 23,3,8,12,16,19,20 * * *'
-  workflow_dispatch: # Ручной запуск через кнопку "Run workflow"
+  workflow_dispatch:  # Ручной запуск через кнопку "Run workflow"
 
 jobs:
   generate-signals:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
       - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
-          # ВСЕ необходимые библиотеки, включая six и numpy
-          pip install requests python-dotenv yfinance feedparser pandas matplotlib ta scipy mplfinance numpy six
-      
+          pip install requests python-dotenv yfinance feedparser pandas matplotlib ta scipy mplfinance
       - uses: actions/cache@v3
         with:
           path: last_signals.json
           key: ${{ runner.os }}-last-signals
           restore-keys: |
             ${{ runner.os }}-last-signals
-      
       - run: python signal_generator.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
-      
       - uses: actions/cache/save@v3
         with:
           path: last_signals.json
