@@ -30,7 +30,8 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
     return base_price
 
 
-def check_binance_volume(symbol: str, min_volume_usdt: float = 50_000_000) -> bool:
+# ✅ ИЗМЕНЕНО: Порог объема снижен до 15 млн для охвата перспективных альткоинов
+def check_binance_volume(symbol: str, min_volume_usdt: float = 15_000_000) -> bool:
     try:
         url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
         response = requests.get(url, timeout=5)
@@ -546,8 +547,9 @@ def main():
     for coin in SCAN_COINS:
         logging.info(f"🔍 Анализ {coin}...")
         
-        if not check_binance_volume(coin, min_volume_usdt=50_000_000):
-            logging.info(f"⏸️ {coin}: Недостаточный суточный объем (< $50 млн). Пропускаем.")
+        # ✅ ИЗМЕНЕНО: Порог объема снижен до 15 млн при вызове функции
+        if not check_binance_volume(coin, min_volume_usdt=15_000_000):
+            logging.info(f"⏸️ {coin}: Недостаточный суточный объем (< $15 млн). Пропускаем.")
             continue
             
         df = get_historical_data(coin)
