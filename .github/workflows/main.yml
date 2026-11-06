@@ -1,33 +1,22 @@
-name: Main Run
+name: Fire Spy Main Run
 
 on:
   # schedule:
   #  # 09:12 и 21:12 МСК (UTC = МСК - 3 часа). Сдвиг на 12 мин помогает избежать очередей GitHub.
   #   - cron: '12 6,18 * * *'
-  workflow_dispatch: # Позволяет запускать вручную из вкладки Actions
+  workflow_dispatch:
 
 jobs:
-  run-signal-generator:
+  run-main:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # ДОБАВЛЕНЫ ВСЕ НЕОБХОДИМЫЕ БИБЛИОТЕКИ, включая six, ta, scipy, mplfinance
-          pip install yfinance requests feedparser pandas matplotlib ta scipy mplfinance numpy python-dotenv six
-          
-      - name: Run Signal Generator
-        run: python signal_generator.py
+      - run: pip install yfinance requests feedparser pandas matplotlib
+      - run: python main.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }} # Оставлен, если используется в других частях кода
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
