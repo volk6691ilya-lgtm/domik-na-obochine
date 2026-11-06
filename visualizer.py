@@ -9,10 +9,8 @@ import ta
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib.font_manager')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 def get_anti_bot_price(price: float, symbol: str) -> float:
-    """
-    Гарантирует, что 4-й знак после запятой НИКОГДА не будет равен 0.
-    """
     base_price = round(float(price), 4)
     last_digit = int(round(base_price * 10000)) % 10
     
@@ -24,11 +22,8 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
             
     return base_price
 
-class ChartVisualizer:
-    """
-    Модуль для генерации профессиональных графиков с разметкой уровней.
-    """
 
+class ChartVisualizer:
     def __init__(self, output_dir="charts"):
         self.output_dir = output_dir
         if not os.path.exists(self.output_dir):
@@ -54,7 +49,6 @@ class ChartVisualizer:
                 entry_float = float(entry_level)
                 tp_float = float(tp_level) if tp_level else entry_float
                 
-                # Рассчитываем риск для ограничений TP
                 risk = abs(entry_float - float(sl_level)) if sl_level else abs(entry_float - tp_float) * 0.5
                 
                 if is_long:
@@ -62,22 +56,19 @@ class ChartVisualizer:
                     tp2 = fib_levels.get('1.0', round(entry_float + (tp_float - entry_float) * 0.7, 4))
                     tp3 = fib_levels.get('1.618', tp_float)
                     
-                    # 🔧 РЕАЛИСТИЧНЫЕ ОГРАНИЧЕНИЯ для 1H таймфрейма (синхронизация с signal_generator.py)
-                    # TP1: минимум R:R 0.8
+                    # ✅ СИНХРОНИЗИРОВАНО С SIGNAL_GENERATOR: 0.8/1.3/1.8
                     if tp1 <= entry_float or (tp1 - entry_float) < (risk * 0.8):
                         tp1 = round(entry_float + (risk * 0.8), 4)
                     
-                    # TP2: максимум R:R 1.5
                     if tp2 <= entry_float:
-                        tp2 = round(entry_float + (risk * 1.5), 4)
-                    elif (tp2 - entry_float) > (risk * 1.5):
-                        tp2 = round(entry_float + (risk * 1.5), 4)
+                        tp2 = round(entry_float + (risk * 1.3), 4)
+                    elif (tp2 - entry_float) > (risk * 1.3):
+                        tp2 = round(entry_float + (risk * 1.3), 4)
                     
-                    # TP3: максимум R:R 2.2
                     if tp3 <= entry_float:
-                        tp3 = round(entry_float + (risk * 2.2), 4)
-                    elif (tp3 - entry_float) > (risk * 2.2):
-                        tp3 = round(entry_float + (risk * 2.2), 4)
+                        tp3 = round(entry_float + (risk * 1.8), 4)
+                    elif (tp3 - entry_float) > (risk * 1.8):
+                        tp3 = round(entry_float + (risk * 1.8), 4)
                         
                 else:
                     tp1 = fib_levels.get('0.382', round(entry_float - (entry_float - tp_float) * 0.4, 4))
@@ -87,19 +78,18 @@ class ChartVisualizer:
                     if tp3 == tp_float and '-0.618' not in fib_levels:
                         tp3 = round(entry_float - (entry_float - tp_float) * 1.5, 4)
                     
-                    #  РЕАЛИСТИЧНЫЕ ОГРАНИЧЕНИЯ для шорта
                     if tp1 >= entry_float or (entry_float - tp1) < (risk * 0.8):
                         tp1 = round(entry_float - (risk * 0.8), 4)
                     
                     if tp2 >= entry_float:
-                        tp2 = round(entry_float - (risk * 1.5), 4)
-                    elif (entry_float - tp2) > (risk * 1.5):
-                        tp2 = round(entry_float - (risk * 1.5), 4)
+                        tp2 = round(entry_float - (risk * 1.3), 4)
+                    elif (entry_float - tp2) > (risk * 1.3):
+                        tp2 = round(entry_float - (risk * 1.3), 4)
                     
                     if tp3 >= entry_float:
-                        tp3 = round(entry_float - (risk * 2.2), 4)
-                    elif (entry_float - tp3) > (risk * 2.2):
-                        tp3 = round(entry_float - (risk * 2.2), 4)
+                        tp3 = round(entry_float - (risk * 1.8), 4)
+                    elif (entry_float - tp3) > (risk * 1.8):
+                        tp3 = round(entry_float - (risk * 1.8), 4)
                         
             elif entry_level != "N/A" and tp_level:
                 entry_float = float(entry_level)
@@ -108,14 +98,13 @@ class ChartVisualizer:
                 
                 if is_long:
                     tp1 = round(entry_float + (risk * 0.8), 4)
-                    tp2 = round(entry_float + (risk * 1.5), 4)
-                    tp3 = round(entry_float + (risk * 2.2), 4)
+                    tp2 = round(entry_float + (risk * 1.3), 4)
+                    tp3 = round(entry_float + (risk * 1.8), 4)
                 else:
                     tp1 = round(entry_float - (risk * 0.8), 4)
-                    tp2 = round(entry_float - (risk * 1.5), 4)
-                    tp3 = round(entry_float - (risk * 2.2), 4)
+                    tp2 = round(entry_float - (risk * 1.3), 4)
+                    tp3 = round(entry_float - (risk * 1.8), 4)
 
-            # Применяем защиту от круглых чисел
             entry_fmt = get_anti_bot_price(float(entry_level), symbol) if entry_level != "N/A" else 0.0
             sl_fmt = get_anti_bot_price(float(sl_level), symbol) if sl_level else 0.0
             tp1_fmt = get_anti_bot_price(float(tp1), symbol) if tp1 is not None else 0.0
@@ -126,37 +115,31 @@ class ChartVisualizer:
             hlines_colors = []
             hlines_styles = []
 
-            # 1. Стоп-лосс (Зеленый) — пунктир
             if sl_level:
                 hlines.append(sl_fmt)
                 hlines_colors.append('lime')
                 hlines_styles.append('--')
 
-            # 2. Точка входа (Синий) — сплошная
             if entry_level and entry_level != "N/A":
                 hlines.append(entry_fmt)
                 hlines_colors.append('dodgerblue')
                 hlines_styles.append('-')
 
-            # 3. TP1 (Оранжевый) — точки
             if tp1 is not None:
                 hlines.append(tp1_fmt)
                 hlines_colors.append('orange')
                 hlines_styles.append(':')
 
-            # 4. TP2 (Оранжево-красный) — точки
             if tp2 is not None:
                 hlines.append(tp2_fmt)
                 hlines_colors.append('orangered')
                 hlines_styles.append(':')
 
-            # 5. TP3 (Красный) — пунктир
             if tp3 is not None:
                 hlines.append(tp3_fmt)
                 hlines_colors.append('red')
                 hlines_styles.append('--')
 
-            # 6. Bollinger Bands как кривые линии
             add_plots = []
             try:
                 bollinger = ta.volatility.BollingerBands(close=df['close'], window=20, window_dev=2)
@@ -200,8 +183,9 @@ class ChartVisualizer:
             logging.error(f"Ошибка при генерации графика: {e}")
             return None
 
+
 if __name__ == "__main__":
-    print("\n--- Тест Chart Visualizer (синхронизированные TP) ---")
+    print("\n--- Тест Chart Visualizer ---")
     
     np.random.seed(42)
     dates = pd.date_range(end='2026-10-20', periods=50, freq='1h')
@@ -236,7 +220,7 @@ if __name__ == "__main__":
 
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен: {os.path.abspath(filepath)}")
-        print("👉 TP на графике теперь синхронизированы с постом (R:R 0.8/1.5/2.2)")
+        print("👉 TP синхронизированы с постом (R:R 0.8/1.3/1.8)")
     else:
         print("\n❌ Ошибка при создании графика.")
 
