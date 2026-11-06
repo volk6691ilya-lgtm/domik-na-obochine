@@ -7,3 +7,5 @@ matplotlib
 ta
 scipy
 mplfinance
+numpy
+six
