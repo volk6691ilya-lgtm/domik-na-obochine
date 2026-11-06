@@ -56,19 +56,19 @@ class ChartVisualizer:
                     tp2 = fib_levels.get('1.0', round(entry_float + (tp_float - entry_float) * 0.7, 4))
                     tp3 = fib_levels.get('1.618', tp_float)
                     
-                    # ✅ СИНХРОНИЗИРОВАНО С SIGNAL_GENERATOR: 0.8/1.3/1.8
-                    if tp1 <= entry_float or (tp1 - entry_float) < (risk * 0.8):
-                        tp1 = round(entry_float + (risk * 0.8), 4)
+                    # ✅ СИНХРОНИЗИРОВАНО С SIGNAL_GENERATOR: 0.7/1.1/1.5 (для 2-4 часов)
+                    if tp1 <= entry_float or (tp1 - entry_float) < (risk * 0.7):
+                        tp1 = round(entry_float + (risk * 0.7), 4)
                     
                     if tp2 <= entry_float:
-                        tp2 = round(entry_float + (risk * 1.3), 4)
-                    elif (tp2 - entry_float) > (risk * 1.3):
-                        tp2 = round(entry_float + (risk * 1.3), 4)
+                        tp2 = round(entry_float + (risk * 1.1), 4)
+                    elif (tp2 - entry_float) > (risk * 1.1):
+                        tp2 = round(entry_float + (risk * 1.1), 4)
                     
                     if tp3 <= entry_float:
-                        tp3 = round(entry_float + (risk * 1.8), 4)
-                    elif (tp3 - entry_float) > (risk * 1.8):
-                        tp3 = round(entry_float + (risk * 1.8), 4)
+                        tp3 = round(entry_float + (risk * 1.5), 4)
+                    elif (tp3 - entry_float) > (risk * 1.5):
+                        tp3 = round(entry_float + (risk * 1.5), 4)
                         
                 else:
                     tp1 = fib_levels.get('0.382', round(entry_float - (entry_float - tp_float) * 0.4, 4))
@@ -78,18 +78,18 @@ class ChartVisualizer:
                     if tp3 == tp_float and '-0.618' not in fib_levels:
                         tp3 = round(entry_float - (entry_float - tp_float) * 1.5, 4)
                     
-                    if tp1 >= entry_float or (entry_float - tp1) < (risk * 0.8):
-                        tp1 = round(entry_float - (risk * 0.8), 4)
+                    if tp1 >= entry_float or (entry_float - tp1) < (risk * 0.7):
+                        tp1 = round(entry_float - (risk * 0.7), 4)
                     
                     if tp2 >= entry_float:
-                        tp2 = round(entry_float - (risk * 1.3), 4)
-                    elif (entry_float - tp2) > (risk * 1.3):
-                        tp2 = round(entry_float - (risk * 1.3), 4)
+                        tp2 = round(entry_float - (risk * 1.1), 4)
+                    elif (entry_float - tp2) > (risk * 1.1):
+                        tp2 = round(entry_float - (risk * 1.1), 4)
                     
                     if tp3 >= entry_float:
-                        tp3 = round(entry_float - (risk * 1.8), 4)
-                    elif (entry_float - tp3) > (risk * 1.8):
-                        tp3 = round(entry_float - (risk * 1.8), 4)
+                        tp3 = round(entry_float - (risk * 1.5), 4)
+                    elif (entry_float - tp3) > (risk * 1.5):
+                        tp3 = round(entry_float - (risk * 1.5), 4)
                         
             elif entry_level != "N/A" and tp_level:
                 entry_float = float(entry_level)
@@ -97,13 +97,13 @@ class ChartVisualizer:
                 risk = abs(entry_float - float(sl_level)) if sl_level else abs(entry_float - tp_float) * 0.5
                 
                 if is_long:
-                    tp1 = round(entry_float + (risk * 0.8), 4)
-                    tp2 = round(entry_float + (risk * 1.3), 4)
-                    tp3 = round(entry_float + (risk * 1.8), 4)
+                    tp1 = round(entry_float + (risk * 0.7), 4)
+                    tp2 = round(entry_float + (risk * 1.1), 4)
+                    tp3 = round(entry_float + (risk * 1.5), 4)
                 else:
-                    tp1 = round(entry_float - (risk * 0.8), 4)
-                    tp2 = round(entry_float - (risk * 1.3), 4)
-                    tp3 = round(entry_float - (risk * 1.8), 4)
+                    tp1 = round(entry_float - (risk * 0.7), 4)
+                    tp2 = round(entry_float - (risk * 1.1), 4)
+                    tp3 = round(entry_float - (risk * 1.5), 4)
 
             entry_fmt = get_anti_bot_price(float(entry_level), symbol) if entry_level != "N/A" else 0.0
             sl_fmt = get_anti_bot_price(float(sl_level), symbol) if sl_level else 0.0
@@ -220,7 +220,7 @@ if __name__ == "__main__":
 
     if filepath:
         print(f"\n✅ УСПЕХ! График сохранен: {os.path.abspath(filepath)}")
-        print("👉 TP синхронизированы с постом (R:R 0.8/1.3/1.8)")
+        print("👉 TP синхронизированы с постом (R:R 0.7/1.1/1.5 для 2-4 часов)")
     else:
         print("\n❌ Ошибка при создании графика.")
 
