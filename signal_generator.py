@@ -1,3 +1,5 @@
+signal_generator.py
+
 import os
 import requests
 import json
@@ -269,22 +271,9 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     
     strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
 
-    # 🎯 НОВОЕ: Проверка идеального Squeeze + конфлюэнса
-    bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
-    max_fib_confluence = ta_data.get('max_fib_confluence', 0)
-    bb_percent_b = ta_data.get('bb_percent_b', 0.5)
-    
-    # Экстремальное положение цены (%B < 0.1 или > 0.9)
-    bb_extreme = bb_percent_b < 0.1 or bb_percent_b > 0.9
-    
-    # Мощное подтверждение: Squeeze + Конфлюэнс + Объем
-    ultra_confirmation = bb_is_perfect_squeeze and max_fib_confluence >= 2 and volume_confirmed
-
     # 🔒 ПОРОГИ С УЧЕТОМ ДОПОЛНИТЕЛЬНЫХ ПОДТВЕРЖДЕНИЙ
     if rr_value >= 1.3 and volume_confirmed:
-        return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 0.9 and ultra_confirmation:
-        return ("high", "🟢", "Высоковероятный сигнал (Идеальный Squeeze + Конфлюэнс)")
+        return ("high", "", "Высоковероятный сигнал")
     elif rr_value >= 0.9 and strong_confirmation:
         return ("high", "🟢", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
     elif rr_value >= 0.9 and volume_confirmed:
@@ -318,10 +307,10 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
         return None
     
-    # 🔧 СВЕРХРЕАЛИСТИЧНЫЕ ЦЕЛИ TP ДЛЯ 1H ТАЙМФРЕЙМА
-    # TP1: R:R 0.7 (сверхбыстрая фиксация 40% — достигается в 95% случаев)
-    # TP2: R:R 1.2 (очень реалистичная цель для 70% — достигается в 85% случаев)
-    # TP3: R:R 1.7 (достижимая цель тренда — достигается в 70% случаев)
+    # 🔧 РЕАЛИСТИЧНЫЕ ЦЕЛИ TP ДЛЯ 1H ТАЙМФРЕЙМА
+    # TP1: R:R 0.8 (быстрая фиксация 40% — достигается в 90% случаев)
+    # TP2: R:R 1.5 (реалистичная цель для 70% — достигается в 80% случаев)
+    # TP3: R:R 2.2 (амбициозная, но достижимая цель — достигается в 60% случаев)
     
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
@@ -329,19 +318,19 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         tp3 = fib_levels.get('1.618', tp)
         
         # Проверка минимальной дистанции для TP1
-        if tp1 <= entry or (tp1 - entry) < (risk * 0.7):
-            tp1 = round(entry + (risk * 0.7), 4)
+        if tp1 <= entry or (tp1 - entry) < (risk * 0.8):
+            tp1 = round(entry + (risk * 0.8), 4)
         
         # Ограничение максимума для TP2 и TP3
         if tp2 <= entry:
-            tp2 = round(entry + (risk * 1.2), 4)
-        elif (tp2 - entry) > (risk * 1.2):
-            tp2 = round(entry + (risk * 1.2), 4)
+            tp2 = round(entry + (risk * 1.5), 4)
+        elif (tp2 - entry) > (risk * 1.5):
+            tp2 = round(entry + (risk * 1.5), 4)
             
         if tp3 <= entry:
-            tp3 = round(entry + (risk * 1.7), 4)
-        elif (tp3 - entry) > (risk * 1.7):
-            tp3 = round(entry + (risk * 1.7), 4)
+            tp3 = round(entry + (risk * 2.2), 4)
+        elif (tp3 - entry) > (risk * 2.2):
+            tp3 = round(entry + (risk * 2.2), 4)
     else:
         tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
@@ -351,19 +340,19 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
             tp3 = round(entry - (entry - tp) * 1.5, 4)
         
         # Проверка минимальной дистанции для TP1
-        if tp1 >= entry or (entry - tp1) < (risk * 0.7):
-            tp1 = round(entry - (risk * 0.7), 4)
+        if tp1 >= entry or (entry - tp1) < (risk * 0.8):
+            tp1 = round(entry - (risk * 0.8), 4)
         
         # Ограничение максимума для TP2 и TP3
         if tp2 >= entry:
-            tp2 = round(entry - (risk * 1.2), 4)
-        elif (entry - tp2) > (risk * 1.2):
-            tp2 = round(entry - (risk * 1.2), 4)
+            tp2 = round(entry - (risk * 1.5), 4)
+        elif (entry - tp2) > (risk * 1.5):
+            tp2 = round(entry - (risk * 1.5), 4)
             
         if tp3 >= entry:
-            tp3 = round(entry - (risk * 1.7), 4)
-        elif (entry - tp3) > (risk * 1.7):
-            tp3 = round(entry - (risk * 1.7), 4)
+            tp3 = round(entry - (risk * 2.2), 4)
+        elif (entry - tp3) > (risk * 2.2):
+            tp3 = round(entry - (risk * 2.2), 4)
     
     # Расчёт взвешенного R:R (40% на TP1, 30% на TP2, 30% на TP3)
     if is_long:
@@ -375,7 +364,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     real_rr_value = round(weighted_rr, 2)
     
     if (not is_long and real_rr_value < 1.1) or (is_long and real_rr_value < 1.0):
-        logging.warning(f"⚠️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
+        logging.warning(f"️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
         return None
 
     rr_value = real_rr_value
@@ -407,7 +396,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     elif quality_level == "medium":
         rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
     else:
-        rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
+        rec = " Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
     entry_fmt = get_anti_bot_price(entry, symbol)
     sl_fmt = get_anti_bot_price(sl, symbol)
@@ -415,23 +404,11 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     tp2_fmt = get_anti_bot_price(tp2, symbol)
     tp3_fmt = get_anti_bot_price(tp3, symbol)
 
-    # 🎯 НОВОЕ: Формирование расширенного Bollinger статуса
-    bb_percent_b = ta_data.get('bb_percent_b', 0.5)
-    bb_width = ta_data.get('bb_width_percent', 0)
-    bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
-    max_fib_confluence = ta_data.get('max_fib_confluence', 0)
-    
-    boll_status_extended = ta_data.get('boll_status', 'Недоступно ⚪')
-    if bb_is_perfect_squeeze:
-        boll_status_extended += f" | %B: {bb_percent_b:.2f}, Width: {bb_width:.1f}%"
-    if max_fib_confluence >= 2:
-        boll_status_extended += f" | 🛡️ Конфлюэнс: {max_fib_confluence} фактора"
-
     post = f"""{quality_emoji} **ТОРГОВЫЙ СИГНАЛ: {coin_name}**
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
 
-🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
+ **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
 • 🔵 **Точка входа (Entry):** ${entry_fmt:.4f}
 • 🟢 **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
@@ -448,7 +425,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 
 📉 **ТЕХНИЧЕСКАЯ КАРТИНА (1H таймфрейм):**
 • Тренд: {ta_data['trend']}
-• Bollinger Bands: {boll_status_extended}
+• Bollinger Bands: {ta_data.get('boll_status', 'Недоступно ⚪')}
 • Импульс: {ta_data['momentum']}
 • MACD: {ta_data['macd']}
 • Объем (PVT): {ta_data['volume_confirmed']}
@@ -460,7 +437,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 📋 **РЕКОМЕНДАЦИЯ:**
 {rec}
 
-⏱️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
+️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
 
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
@@ -478,7 +455,7 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
     if not bot_token or not channel_id:
-        logging.error("❌ Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
+        logging.error(" Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
         return
 
     try:
@@ -486,7 +463,7 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
             coin_name = symbol.replace('USDT', '')
             short_caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n"
             short_caption += f"🎯 Точка входа + SL/TP\n\n"
-            short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
+            short_caption += f" *Полный разбор с дисклеймером — в следующем сообщении*"
             
             files = {
                 'photo': ('signal_chart.png', f, 'image/png'),
@@ -552,7 +529,7 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
                 logging.error(f"❌ Ошибка отправки текста: {response.text}")
                 
     except Exception as e:
-        logging.error(f"❌ Ошибка отправки текста: {e}")
+        logging.error(f" Ошибка отправки текста: {e}")
 
 def main():
     logging.info("🌙 Запуск Лунного Дозора v3.0 (1H таймфрейм, краткосрочные сигналы 4-8 часов)")
@@ -608,14 +585,6 @@ def main():
             continue
         
         score = rr_value + (0.4 if "Да ✅" in ta_data['volume_confirmed'] else 0)
-        
-        # 🎯 НОВОЕ: Бонус за идеальный Squeeze + конфлюэнс
-        bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
-        max_fib_confluence = ta_data.get('max_fib_confluence', 0)
-        if bb_is_perfect_squeeze and max_fib_confluence >= 2:
-            score += 0.3
-            logging.info(f"🔥 {coin}: Бонус +0.3 за Идеальный Squeeze + Конфлюэнс!")
-        
         logging.info(f"✅ {coin}: Score {score}")
         
         if score > best_score:
@@ -627,7 +596,7 @@ def main():
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            logging.info(f"️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
             return
         
         logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
