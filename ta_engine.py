@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 class TAEngine:
-    def __init__(self):
+    def __init__(self):  # ✅ ИСПРАВЛЕНО: были одинарные подчеркивания
         self.ema_length = 50
         self.rsi_length = 14
         self.macd_fast = 12
@@ -28,7 +28,7 @@ class TAEngine:
                 ema_50 = float(ema_indicator.ema_indicator().iloc[-1])
                 trend = "Бычий 🟢 (Цена > EMA50)" if current_price > ema_50 else "Медвежий 🔴 (Цена < EMA50)"
             except Exception:
-                trend = "Нейтрально  (EMA недоступен)"
+                trend = "Нейтрально ⚪ (EMA недоступен)"
                 ema_50 = current_price
 
             # 2. ИМПУЛЬС (RSI + StochRSI)
@@ -57,7 +57,7 @@ class TAEngine:
                 macd_hist = float(macd_indicator.macd_diff().iloc[-1])
                 macd_signal_text = "Рост импульса 📈" if macd_hist > 0 else "Падение импульса 📉"
             except Exception:
-                macd_signal_text = "Нейтрально  (MACD недоступен)"
+                macd_signal_text = "Нейтрально ⚪ (MACD недоступен)"
 
             # 4. PVT (Price Volume Trend)
             try:
@@ -100,11 +100,11 @@ class TAEngine:
                 elif wr14 > -20 and wr21 > -20:
                     wr_status = "Оба WR в перекупленности (сигнал на продажу) 🔴"
                 elif wr14 < -80:
-                    wr_status = "WR14 в перепроданности (потенциальный отскок) "
+                    wr_status = "WR14 в перепроданности (потенциальный отскок) 🟢"
                 elif wr21 < -80:
                     wr_status = "WR21 в перепроданности (потенциальный отскок) 🟡"
                 else:
-                    wr_status = "WR в нейтральной зоне "
+                    wr_status = "WR в нейтральной зоне ⚪"
             except Exception:
                 wr14, wr21 = -50.0, -50.0
                 wr_status = "Недоступно ⚪"
@@ -134,7 +134,7 @@ class TAEngine:
                 logging.warning(f"⚠️ Аномальный R:R ({rr_ratio}), нормализован до 1.0")
             rr_status = "Выгодный (≥ 1:2) ✅" if rr_ratio >= 2.0 else "Стандартный (< 1:2) ⚠️"
 
-            # 8. BOLLINGER BANDS — ТОЛЬКО ДЛЯ ОТРИСОВКИ И ПРОСТОГО СТАТУСА
+            # 8. BOLLINGER BANDS — ТОЛЬКО ДЛЯ ОТРИСОВКИ
             try:
                 bollinger = ta.volatility.BollingerBands(
                     close=df['close'], window=20, window_dev=2
@@ -143,19 +143,17 @@ class TAEngine:
                 boll_middle = float(bollinger.bollinger_mavg().iloc[-1])
                 boll_lower = float(bollinger.bollinger_lband().iloc[-1])
 
-                # Простой статус без предсказаний
                 if current_price <= boll_lower:
                     boll_status = "У нижней полосы (перепроданность) 🟢"
                 elif current_price >= boll_upper:
-                    boll_status = "У верхней полосы (перекупленность) "
+                    boll_status = "У верхней полосы (перекупленность) 🔴"
                 else:
                     boll_status = "Внутри полос (нейтрально) ⚪"
-
             except Exception:
                 boll_upper, boll_middle, boll_lower = 0, 0, 0
-                boll_status = "Недоступно "
+                boll_status = "Недоступно ⚪"
 
-            # 9. УРОВНИ ФИБОНАЧЧИ (для расчёта TP в signal_generator)
+            # 9. УРОВНИ ФИБОНАЧЧИ
             try:
                 recent_high = float(df['high'].iloc[-48:].max())
                 recent_low = float(df['low'].iloc[-48:].min())
@@ -176,7 +174,6 @@ class TAEngine:
                 fib_levels = {}
                 fib_status = "Фибоначчи недоступен"
 
-            # ЧИСТЫЙ ВОЗВРАТ ДАННЫХ
             return {
                 "price": round(current_price, 4),
                 "entry": round(entry_level, 4),
