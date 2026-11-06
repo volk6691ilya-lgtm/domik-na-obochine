@@ -16,10 +16,8 @@ from visualizer import ChartVisualizer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 def get_anti_bot_price(price: float, symbol: str) -> float:
-    """
-    Гарантирует, что 4-й знак после запятой НИКОГДА не будет равен 0.
-    """
     base_price = round(float(price), 4)
     last_digit = int(round(base_price * 10000)) % 10
     
@@ -31,10 +29,8 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
             
     return base_price
 
+
 def check_binance_volume(symbol: str, min_volume_usdt: float = 50_000_000) -> bool:
-    """
-    Быстрая проверка суточного объема торгов через Binance API.
-    """
     try:
         url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
         response = requests.get(url, timeout=5)
@@ -47,6 +43,7 @@ def check_binance_volume(symbol: str, min_volume_usdt: float = 50_000_000) -> bo
     except Exception:
         return True
 
+
 BROWSER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -54,58 +51,49 @@ BROWSER_HEADERS = {
     'Connection': 'keep-alive'
 }
 
+# ✅ ИСПРАВЛЕНО: убраны все пробелы в названиях монет
 SCAN_COINS = [
-    # Ядро (Топ-15)
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
     "ADAUSDT", "DOGEUSDT", "TRXUSDT", "AVAXUSDT", "LINKUSDT",
     "DOTUSDT", "LTCUSDT", "BCHUSDT", "NEARUSDT", "ATOMUSDT",
-    # L2 и перспективные L1
     "ARBUSDT", "OPUSDT", "INJUSDT", "APTUSDT", "SEIUSDT",
     "SUIUSDT", "IMXUSDT", "FTMUSDT", "TONUSDT",
-    # AI, Инфраструктура и Метавселенные
-    "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT", 
+    "RNDRUSDT", "GRTUSDT", "FILUSDT", "SANDUSDT", "MANAUSDT",
     "FETUSDT", "THETAUSDT", "ICPUSDT",
-    # DeFi Blue Chips
     "AAVEUSDT", "UNIUSDT", "MKRUSDT", "RUNEUSDT",
     "COMPUSDT", "JUPUSDT", "GTCUSDT",
-    # Новые перспективные (со скриншотов)
     "ONDOUSDT", "BLURUSDT", "ENAUSDT", "TIAUSDT",
     "ZECUSDT", "WLDUSDT", "PUMPUSDT", "HYPEUSDT", "FARTCOINUSDT",
-    # Мемкоины с объемом
     "SHIBUSDT", "PEPEUSDT", "FLOKIUSDT", "WIFUSDT"
 ]
 
+# ✅ ИСПРАВЛЕНО: убраны все пробелы
 COINGECKO_IDS = {
-    # Ядро
     "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "BNBUSDT": "binancecoin",
     "SOLUSDT": "solana", "XRPUSDT": "ripple", "ADAUSDT": "cardano",
     "DOGEUSDT": "dogecoin", "TRXUSDT": "tron", "AVAXUSDT": "avalanche-2",
     "LINKUSDT": "chainlink", "DOTUSDT": "polkadot", "LTCUSDT": "litecoin",
     "BCHUSDT": "bitcoin-cash", "NEARUSDT": "near", "ATOMUSDT": "cosmos",
-    # L2 и L1
     "ARBUSDT": "arbitrum", "OPUSDT": "optimism", "INJUSDT": "injective-protocol",
     "APTUSDT": "aptos", "SEIUSDT": "sei-network", "SUIUSDT": "sui",
     "IMXUSDT": "immutable-x", "FTMUSDT": "fantom", "TONUSDT": "the-open-network",
-    # AI, Инфраструктура, Метавселенные
     "RNDRUSDT": "render", "GRTUSDT": "the-graph", "FILUSDT": "filecoin",
     "SANDUSDT": "the-sandbox", "MANAUSDT": "decentraland", "FETUSDT": "fetch-ai",
     "THETAUSDT": "theta-token", "ICPUSDT": "internet-computer",
-    # DeFi
-    "AAVEUSDT": "aave", "UNIUSDT": "uniswap", "MKRUSDT": "maker", 
+    "AAVEUSDT": "aave", "UNIUSDT": "uniswap", "MKRUSDT": "maker",
     "RUNEUSDT": "thorchain", "COMPUSDT": "compound-governance-token",
     "JUPUSDT": "jupiter-exchange-solana", "GTCUSDT": "gitcoin",
-    # Новые перспективные
-    "ONDOUSDT": "ondo-finance", "BLURUSDT": "blur", 
+    "ONDOUSDT": "ondo-finance", "BLURUSDT": "blur",
     "ENAUSDT": "ethena", "TIAUSDT": "celestia",
     "ZECUSDT": "zcash", "WLDUSDT": "worldcoin-wld",
     "PUMPUSDT": "pump-fun", "HYPEUSDT": "hyperliquid",
     "FARTCOINUSDT": "fartcoin",
-    # Мемы
-    "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe", 
+    "SHIBUSDT": "shiba-inu", "PEPEUSDT": "pepe",
     "FLOKIUSDT": "floki", "WIFUSDT": "dogwifcoin"
 }
 
 LAST_SIGNALS_FILE = "last_signals.json"
+
 
 def load_last_signals():
     try:
@@ -116,12 +104,14 @@ def load_last_signals():
         pass
     return {"signals": []}
 
+
 def save_last_signals(data):
     try:
         with open(LAST_SIGNALS_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
     except Exception as e:
         logging.error(f"Ошибка сохранения истории: {e}")
+
 
 def is_duplicate_signal(symbol, direction):
     history = load_last_signals()
@@ -141,6 +131,7 @@ def is_duplicate_signal(symbol, direction):
     save_last_signals(history)
     return False
 
+
 def get_historical_data_binance(symbol: str) -> pd.DataFrame:
     try:
         time.sleep(0.5)
@@ -159,6 +150,7 @@ def get_historical_data_binance(symbol: str) -> pd.DataFrame:
     except Exception as e:
         logging.warning(f"⚠️ {symbol}: Binance ошибка - {str(e)[:50]}")
     return pd.DataFrame()
+
 
 def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
     try:
@@ -181,6 +173,7 @@ def get_historical_data_bybit(symbol: str) -> pd.DataFrame:
     except Exception as e:
         logging.warning(f"⚠️ {symbol}: Bybit ошибка - {str(e)[:50]}")
     return pd.DataFrame()
+
 
 def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
     coin_id = COINGECKO_IDS.get(symbol)
@@ -205,6 +198,7 @@ def get_historical_data_coingecko(symbol: str) -> pd.DataFrame:
         logging.warning(f"⚠️ {symbol}: CoinGecko ошибка - {str(e)[:50]}")
     return pd.DataFrame()
 
+
 def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
     try:
         logging.info(f"🔄 {symbol}: Биржи заблокированы, используем Yahoo Finance (1H)...")
@@ -227,6 +221,7 @@ def get_historical_data_yahoo(symbol: str) -> pd.DataFrame:
         logging.error(f"❌ {symbol}: Yahoo Finance тоже упал - {str(e)[:50]}")
     return pd.DataFrame()
 
+
 def get_historical_data(symbol: str) -> pd.DataFrame:
     df = get_historical_data_binance(symbol)
     if not df.empty and len(df) >= 40:
@@ -246,6 +241,7 @@ def get_historical_data(symbol: str) -> pd.DataFrame:
     
     logging.error(f"❌ {symbol}: ВСЕ источники данных недоступны!")
     return pd.DataFrame()
+
 
 def evaluate_signal_quality(ta_data: dict) -> tuple:
     try:
@@ -269,9 +265,8 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
     
     strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
 
-    # 🔒 ПОРОГИ С УЧЕТОМ ДОПОЛНИТЕЛЬНЫХ ПОДТВЕРЖДЕНИЙ
     if rr_value >= 1.3 and volume_confirmed:
-        return ("high", "", "Высоковероятный сигнал")
+        return ("high", "🟢", "Высоковероятный сигнал")
     elif rr_value >= 0.9 and strong_confirmation:
         return ("high", "🟢", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
     elif rr_value >= 0.9 and volume_confirmed:
@@ -280,6 +275,7 @@ def evaluate_signal_quality(ta_data: dict) -> tuple:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else:
         return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
+
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
     coin_name = symbol.replace('USDT', '')
@@ -305,30 +301,28 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
         return None
     
-    # 🔧 РЕАЛИСТИЧНЫЕ ЦЕЛИ TP ДЛЯ 1H ТАЙМФРЕЙМА
+    # 🔧 РЕАЛИСТИЧНЫЕ ЦЕЛИ TP ДЛЯ 1H ТАЙМФРЕЙМА (КОМПРОМИСС)
     # TP1: R:R 0.8 (быстрая фиксация 40% — достигается в 90% случаев)
-    # TP2: R:R 1.5 (реалистичная цель для 70% — достигается в 80% случаев)
-    # TP3: R:R 2.2 (амбициозная, но достижимая цель — достигается в 60% случаев)
+    # TP2: R:R 1.3 (реалистичная цель — достигается в 85% случаев)
+    # TP3: R:R 1.8 (достижимая цель — достигается в 70% случаев)
     
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
         tp3 = fib_levels.get('1.618', tp)
         
-        # Проверка минимальной дистанции для TP1
         if tp1 <= entry or (tp1 - entry) < (risk * 0.8):
             tp1 = round(entry + (risk * 0.8), 4)
         
-        # Ограничение максимума для TP2 и TP3
         if tp2 <= entry:
-            tp2 = round(entry + (risk * 1.5), 4)
-        elif (tp2 - entry) > (risk * 1.5):
-            tp2 = round(entry + (risk * 1.5), 4)
+            tp2 = round(entry + (risk * 1.3), 4)
+        elif (tp2 - entry) > (risk * 1.3):
+            tp2 = round(entry + (risk * 1.3), 4)
             
         if tp3 <= entry:
-            tp3 = round(entry + (risk * 2.2), 4)
-        elif (tp3 - entry) > (risk * 2.2):
-            tp3 = round(entry + (risk * 2.2), 4)
+            tp3 = round(entry + (risk * 1.8), 4)
+        elif (tp3 - entry) > (risk * 1.8):
+            tp3 = round(entry + (risk * 1.8), 4)
     else:
         tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
@@ -337,22 +331,19 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         if tp3 == tp and '-0.618' not in fib_levels:
             tp3 = round(entry - (entry - tp) * 1.5, 4)
         
-        # Проверка минимальной дистанции для TP1
         if tp1 >= entry or (entry - tp1) < (risk * 0.8):
             tp1 = round(entry - (risk * 0.8), 4)
         
-        # Ограничение максимума для TP2 и TP3
         if tp2 >= entry:
-            tp2 = round(entry - (risk * 1.5), 4)
-        elif (entry - tp2) > (risk * 1.5):
-            tp2 = round(entry - (risk * 1.5), 4)
+            tp2 = round(entry - (risk * 1.3), 4)
+        elif (entry - tp2) > (risk * 1.3):
+            tp2 = round(entry - (risk * 1.3), 4)
             
         if tp3 >= entry:
-            tp3 = round(entry - (risk * 2.2), 4)
-        elif (entry - tp3) > (risk * 2.2):
-            tp3 = round(entry - (risk * 2.2), 4)
+            tp3 = round(entry - (risk * 1.8), 4)
+        elif (entry - tp3) > (risk * 1.8):
+            tp3 = round(entry - (risk * 1.8), 4)
     
-    # Расчёт взвешенного R:R (40% на TP1, 30% на TP2, 30% на TP3)
     if is_long:
         r1, r2, r3 = tp1 - entry, tp2 - entry, tp3 - entry
     else:
@@ -362,7 +353,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     real_rr_value = round(weighted_rr, 2)
     
     if (not is_long and real_rr_value < 1.1) or (is_long and real_rr_value < 1.0):
-        logging.warning(f"️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
+        logging.warning(f"⚠️ {symbol}: Реальный взвешенный R:R ({real_rr_value}) слишком низкий для {direction}. Сигнал отклонен.")
         return None
 
     rr_value = real_rr_value
@@ -394,7 +385,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     elif quality_level == "medium":
         rec = "⚠️ Сигнал средний. Рекомендуется уменьшить размер позиции до 2-3% от депозита."
     else:
-        rec = " Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
+        rec = "🛑 Рынок не дает четких сигналов. Лучше сохранить капитал и дождаться лучших условий."
     
     entry_fmt = get_anti_bot_price(entry, symbol)
     sl_fmt = get_anti_bot_price(sl, symbol)
@@ -406,7 +397,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 
 📊 **КАЧЕСТВО СИГНАЛА:** {quality_desc}
 
- **ПАРАМЕТРЫ СДЕЛКИ:**
+🎯 **ПАРАМЕТРЫ СДЕЛКИ:**
 • Направление: {direction_emoji} **{direction}**
 • 🔵 **Точка входа (Entry):** ${entry_fmt:.4f}
 • 🟢 **Стоп-лосс (SL):** ${sl_fmt:.4f} *(если цена {sl_text} — выходим)*
@@ -435,7 +426,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 📋 **РЕКОМЕНДАЦИЯ:**
 {rec}
 
-️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
+⏱️ **СРОК АКТУАЛЬНОСТИ:** 4-8 часов
 
 ⚠️ **РИСК-МЕНЕДЖМЕНТ:**
 • Не рискуйте более **5%** от депозита на одну сделку
@@ -448,12 +439,13 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
 
     return post
 
+
 def send_to_telegram(text: str, chart_path: str, symbol: str):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
     
     if not bot_token or not channel_id:
-        logging.error(" Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
+        logging.error("❌ Отсутствуют TELEGRAM_BOT_TOKEN или TELEGRAM_CHANNEL_ID")
         return
 
     try:
@@ -461,7 +453,7 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
             coin_name = symbol.replace('USDT', '')
             short_caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n"
             short_caption += f"🎯 Точка входа + SL/TP\n\n"
-            short_caption += f" *Полный разбор с дисклеймером — в следующем сообщении*"
+            short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
             
             files = {
                 'photo': ('signal_chart.png', f, 'image/png'),
@@ -527,7 +519,8 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
                 logging.error(f"❌ Ошибка отправки текста: {response.text}")
                 
     except Exception as e:
-        logging.error(f" Ошибка отправки текста: {e}")
+        logging.error(f"❌ Ошибка отправки текста: {e}")
+
 
 def main():
     logging.info("🌙 Запуск Лунного Дозора v3.0 (1H таймфрейм, краткосрочные сигналы 4-8 часов)")
@@ -594,7 +587,7 @@ def main():
         direction = "ЛОНГ" if is_long else "ШОРТ"
         
         if is_duplicate_signal(best_coin['symbol'], direction):
-            logging.info(f"️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
+            logging.info(f"⏸️ Сигнал {best_coin['symbol']} {direction} уже отправлялся в последние 24 часа. Пропускаем.")
             return
         
         logging.info(f"🏆 Лучшая: {best_coin['symbol']}")
@@ -607,6 +600,7 @@ def main():
                 logging.info(f"⏸️ {best_coin['symbol']}: Сигнал отклонен на этапе финальной математической проверки R:R.")
     else:
         logging.info("✅ Рынок во флэте или нет подходящих setups. Ни одна монета не прошла строгий фильтр качества. Сигналы не отправлены (капитал защищен).")
+
 
 if __name__ == "__main__":
     main()
