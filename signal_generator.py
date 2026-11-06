@@ -314,15 +314,16 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         if tp1 <= entry or (tp1 - entry) < (risk * 0.8):
             tp1 = round(entry + (risk * 0.8), 4)
         
+        if tp1 <= entry or (tp1 - entry) < (risk * 0.7):
+            tp1 = round(entry + (risk * 0.7), 4)
         if tp2 <= entry:
-            tp2 = round(entry + (risk * 1.3), 4)
-        elif (tp2 - entry) > (risk * 1.3):
-            tp2 = round(entry + (risk * 1.3), 4)
-            
+            tp2 = round(entry + (risk * 1.1), 4)
+        elif (tp2 - entry) > (risk * 1.1):
+            tp2 = round(entry + (risk * 1.1), 4)
         if tp3 <= entry:
-            tp3 = round(entry + (risk * 1.8), 4)
-        elif (tp3 - entry) > (risk * 1.8):
-            tp3 = round(entry + (risk * 1.8), 4)
+            tp3 = round(entry + (risk * 1.5), 4)
+        elif (tp3 - entry) > (risk * 1.5):
+            tp3 = round(entry + (risk * 1.5), 4)
     else:
         tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
