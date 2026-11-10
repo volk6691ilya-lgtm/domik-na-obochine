@@ -250,7 +250,6 @@ def get_historical_data(symbol: str) -> pd.DataFrame:
     return pd.DataFrame()
 
 
-# ✅ ОБНОВЛЕНО: Добавлены параметры macro_regime и pattern_data для жестких фильтров
 def evaluate_signal_quality(ta_data: dict, macro_regime: str = "", pattern_data: dict = None) -> tuple:
     try:
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
@@ -317,7 +316,7 @@ def evaluate_signal_quality(ta_data: dict, macro_regime: str = "", pattern_data:
     elif rr_value >= 1.3 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else:
-        return ("low", "", "Низкая вероятность — лучше воздержаться")
+        return ("low", "⚪", "Низкая вероятность — лучше воздержаться") # ✅ ИСПРАВЛЕНО: добавлен эмодзи
 
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
@@ -345,27 +344,29 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         return None
     
     # 🔧 СВЕРХРЕАЛИСТИЧНЫЕ ЦЕЛИ TP ДЛЯ 1H ТАЙМФРЕЙМА (2-4 часа)
-    # TP1: R:R 0.7 (быстрая фиксация 40% — достигается в 95% случаев)
-    # TP2: R:R 1.1 (реалистичная цель для 30% — достигается в 85-90% случаев)
-    # TP3: R:R 1.5 (достижимая цель тренда для 30% — достигается в 70-75% случаев)
+    # Жесткие границы не дадут целям улететь слишком далеко или быть слишком близко
     
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
         tp3 = fib_levels.get('1.618', tp)
         
-        if tp1 <= entry or (tp1 - entry) < (risk * 0.7):
+        # Принудительная установка границ R:R для 2-4 часов
+        if (tp1 - entry) < (risk * 0.7):
             tp1 = round(entry + (risk * 0.7), 4)
-        
-        if tp2 <= entry:
-            tp2 = round(entry + (risk * 1.1), 4)
-        elif (tp2 - entry) > (risk * 1.1):
-            tp2 = round(entry + (risk * 1.1), 4)
+        elif (tp1 - entry) > (risk * 1.0):
+            tp1 = round(entry + (risk * 1.0), 4)
             
-        if tp3 <= entry:
-            tp3 = round(entry + (risk * 1.5), 4)
-        elif (tp3 - entry) > (risk * 1.5):
-            tp3 = round(entry + (risk * 1.5), 4)
+        if (tp2 - entry) < (risk * 1.1):
+            tp2 = round(entry + (risk * 1.1), 4)
+        elif (tp2 - entry) > (risk * 1.3):
+            tp2 = round(entry + (risk * 1.3), 4)
+            
+        if (tp3 - entry) < (risk * 1.4):
+            tp3 = round(entry + (risk * 1.4), 4)
+        elif (tp3 - entry) > (risk * 1.6):
+            tp3 = round(entry + (risk * 1.6), 4)
+            
     else:
         tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
@@ -374,18 +375,21 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         if tp3 == tp and '-0.618' not in fib_levels:
             tp3 = round(entry - (entry - tp) * 1.5, 4)
         
-        if tp1 >= entry or (entry - tp1) < (risk * 0.7):
+        # Принудительная установка границ R:R для 2-4 часов (симметрично лонгу)
+        if (entry - tp1) < (risk * 0.7):
             tp1 = round(entry - (risk * 0.7), 4)
-        
-        if tp2 >= entry:
-            tp2 = round(entry - (risk * 1.1), 4)
-        elif (entry - tp2) > (risk * 1.1):
-            tp2 = round(entry - (risk * 1.1), 4)
+        elif (entry - tp1) > (risk * 1.0):
+            tp1 = round(entry - (risk * 1.0), 4)
             
-        if tp3 >= entry:
-            tp3 = round(entry - (risk * 1.5), 4)
-        elif (entry - tp3) > (risk * 1.5):
-            tp3 = round(entry - (risk * 1.5), 4)
+        if (entry - tp2) < (risk * 1.1):
+            tp2 = round(entry - (risk * 1.1), 4)
+        elif (entry - tp2) > (risk * 1.3):
+            tp2 = round(entry - (risk * 1.3), 4)
+            
+        if (entry - tp3) < (risk * 1.4):
+            tp3 = round(entry - (risk * 1.4), 4)
+        elif (entry - tp3) > (risk * 1.6):
+            tp3 = round(entry - (risk * 1.6), 4)
     
     # Расчёт взвешенного R:R (40% на TP1, 30% на TP2, 30% на TP3)
     if is_long:
