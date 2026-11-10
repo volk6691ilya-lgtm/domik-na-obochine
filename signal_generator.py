@@ -255,7 +255,6 @@ def evaluate_signal_quality(ta_data: dict, macro_regime: str = "", pattern_data:
     try:
         rr_str = ta_data['estimated_R:R'].split(':')[1].strip().split()[0]
         rr_value = float(rr_str)
-        
         if rr_value > 10.0:
             rr_value = 1.0
             logging.warning(f"⚠️ Аномальный R:R ({rr_str}), нормализован до 1.0")
@@ -264,42 +263,53 @@ def evaluate_signal_quality(ta_data: dict, macro_regime: str = "", pattern_data:
         
     volume_confirmed = "Да ✅" in ta_data['volume_confirmed']
     is_long = "Бычий" in ta_data.get('trend', '')
-    
     boll_status = ta_data.get('boll_status', '').lower()
     wr_status = ta_data.get('wr_status', '').lower()
     
     bb_aligned = (is_long and "нижней" in boll_status) or (not is_long and "верхней" in boll_status)
     wr_aligned = (is_long and "перепроданн" in wr_status) or (not is_long and "перекупленн" in wr_status)
-    
     strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
 
-    # 🛡️ ЖЕСТКИЕ ФИЛЬТРЫ БЕЗОПАСНОСТИ
+    # 🛡️ ЖЕСТКИЕ ФИЛЬТРЫ БЕЗОПАСНОСТИ (РАБОТАЮТ В ОБЕ СТОРОНЫ!)
+    
     # 1. Блокировка ЛОНГА в режиме SHORT (паника на рынке)
     if "🔴 SHORT" in macro_regime and is_long:
         logging.warning(f"⛔ БЛОКИРОВКА: Глобальный режим SHORT, но сигнал LONG")
         return ("low", "⚪", "Низкая вероятность — рынок в панике (SHORT режим)")
     
-    # 2. Блокировка ЛОНГА при медвежьем паттерне
+    # 2. Блокировка ШОРТА в режиме LONG (рынок растет)
+    if "🟢 LONG" in macro_regime and not is_long:
+        logging.warning(f"⛔ БЛОКИРОВКА: Глобальный режим LONG, но сигнал SHORT")
+        return ("low", "⚪", "Низкая вероятность — рынок в режиме роста (LONG)")
+    
+    # 3. Блокировка при противоречивых паттернах
     if pattern_data:
         patterns = pattern_data.get('patterns', [])
+        has_bullish_pattern = any('Бычий' in p or 'Двойное Дно' in p for p in patterns)
         has_bearish_pattern = any('Медвежий' in p or 'Двойная Вершина' in p for p in patterns)
+        
+        # Если есть И бычий, И медвежий паттерн одновременно — это неопределенность!
+        if has_bullish_pattern and has_bearish_pattern:
+            logging.warning(f"⛔ БЛОКИРОВКА: Обнаружены противоречивые паттерны")
+            return ("low", "⚪", "Низкая вероятность — противоречивые паттерны (неопределенность)")
+        
+        # Если медвежий паттерн + лонг = блокировка
         if has_bearish_pattern and is_long:
             logging.warning(f"⛔ БЛОКИРОВКА: Обнаружен медвежий паттерн, но сигнал LONG")
             return ("low", "⚪", "Низкая вероятность — обнаружен медвежий паттерн разворота")
+        
+        # Если бычий паттерн + шорт = блокировка
+        if has_bullish_pattern and not is_long:
+            logging.warning(f"⛔ БЛОКИРОВКА: Обнаружен бычий паттерн, но сигнал SHORT")
+            return ("low", "⚪", "Низкая вероятность — обнаружен бычий паттерн разворота")
 
-    # 🎯 Проверка идеального Squeeze + конфлюэнса (из ta_engine)
-    bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
-    max_fib_confluence = ta_data.get('max_fib_confluence', 0)
-    bb_percent_b = ta_data.get('bb_percent_b', 0.5)
-    
-    # Мощное подтверждение: Squeeze + Конфлюэнс + Объем
-    ultra_confirmation = bb_is_perfect_squeeze and max_fib_confluence >= 2 and volume_confirmed
+    # 4. Если объем не подтвержден, требуем очень высокий R:R
+    if not volume_confirmed and rr_value < 1.5:
+        return ("low", "⚪", "Низкая вероятность — движение не подтверждено объемом")
 
-    # 🔒 ПОРОГИ С УЧЕТОМ ДОПОЛНИТЕЛЬНЫХ ПОДТВЕРЖДЕНИЙ
+    # СТАНДАРТНАЯ ОЦЕНКА (если прошли все фильтры)
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
-    elif rr_value >= 0.9 and ultra_confirmation:
-        return ("high", "🟢", "Высоковероятный сигнал (Идеальный Squeeze + Конфлюэнс)")
     elif rr_value >= 0.9 and strong_confirmation:
         return ("high", "🟢", "Высоковероятный сигнал (подтверждено BB + WR + Объем)")
     elif rr_value >= 0.9 and volume_confirmed:
@@ -307,7 +317,7 @@ def evaluate_signal_quality(ta_data: dict, macro_regime: str = "", pattern_data:
     elif rr_value >= 1.3 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else:
-        return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
+        return ("low", "", "Низкая вероятность — лучше воздержаться")
 
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
