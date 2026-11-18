@@ -18,6 +18,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 def get_anti_bot_price(price: float, symbol: str) -> float:
+    """Гарантирует, что 4-й знак после запятой НИКОГДА не будет равен 0."""
     base_price = round(float(price), 4)
     last_digit = int(round(base_price * 10000)) % 10
     
@@ -31,6 +32,7 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
 
 
 def check_binance_volume(symbol: str, min_volume_usdt: float = 15_000_000) -> bool:
+    """Быстрая проверка суточного объема торгов через Binance API."""
     try:
         url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
         response = requests.get(url, timeout=5)
@@ -325,25 +327,26 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
         return None
     
+    # 🔧 100% СИНХРОНИЗАЦИЯ С VISUALIZER.PY: жесткие границы 0.7 / 1.1 / 1.5
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
         tp3 = fib_levels.get('1.618', tp)
         
-        if (tp1 - entry) < (risk * 0.7):
+        if tp1 <= entry or (tp1 - entry) < (risk * 0.7):
             tp1 = round(entry + (risk * 0.7), 4)
         elif (tp1 - entry) > (risk * 1.0):
-            tp1 = round(entry + (risk * 1.0), 4)
+            tp1 = round(entry + (risk * 0.7), 4) # Принудительно возвращаем к 0.7
             
-        if (tp2 - entry) < (risk * 1.1):
+        if tp2 <= entry:
             tp2 = round(entry + (risk * 1.1), 4)
         elif (tp2 - entry) > (risk * 1.3):
-            tp2 = round(entry + (risk * 1.3), 4)
+            tp2 = round(entry + (risk * 1.1), 4) # Принудительно возвращаем к 1.1
             
-        if (tp3 - entry) < (risk * 1.4):
-            tp3 = round(entry + (risk * 1.4), 4)
+        if tp3 <= entry:
+            tp3 = round(entry + (risk * 1.5), 4)
         elif (tp3 - entry) > (risk * 1.6):
-            tp3 = round(entry + (risk * 1.6), 4)
+            tp3 = round(entry + (risk * 1.5), 4) # Принудительно возвращаем к 1.5
     else:
         tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
@@ -352,20 +355,20 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         if tp3 == tp and '-0.618' not in fib_levels:
             tp3 = round(entry - (entry - tp) * 1.5, 4)
         
-        if (entry - tp1) < (risk * 0.7):
+        if tp1 >= entry or (entry - tp1) < (risk * 0.7):
             tp1 = round(entry - (risk * 0.7), 4)
         elif (entry - tp1) > (risk * 1.0):
-            tp1 = round(entry - (risk * 1.0), 4)
+            tp1 = round(entry - (risk * 0.7), 4)
             
-        if (entry - tp2) < (risk * 1.1):
+        if tp2 >= entry:
             tp2 = round(entry - (risk * 1.1), 4)
         elif (entry - tp2) > (risk * 1.3):
-            tp2 = round(entry - (risk * 1.3), 4)
+            tp2 = round(entry - (risk * 1.1), 4)
             
-        if (entry - tp3) < (risk * 1.4):
-            tp3 = round(entry - (risk * 1.4), 4)
+        if tp3 >= entry:
+            tp3 = round(entry - (risk * 1.5), 4)
         elif (entry - tp3) > (risk * 1.6):
-            tp3 = round(entry - (risk * 1.6), 4)
+            tp3 = round(entry - (risk * 1.5), 4)
     
     if is_long:
         r1, r2, r3 = tp1 - entry, tp2 - entry, tp3 - entry
@@ -411,6 +414,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     tp2_fmt = get_anti_bot_price(tp2, symbol)
     tp3_fmt = get_anti_bot_price(tp3, symbol)
 
+    # Безопасное получение доп. параметров из ta_data
     bb_percent_b = ta_data.get('bb_percent_b', 0.0)
     bb_width = ta_data.get('bb_width_percent', 0.0)
     bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
