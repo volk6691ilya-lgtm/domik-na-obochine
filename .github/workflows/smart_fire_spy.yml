@@ -17,7 +17,6 @@ jobs:
       - name: Check if monitoring is needed
         id: timecheck
         run: |
-          # Проверяем, есть ли файл last_signals.json в кэше
           if [ -f "last_signals.json" ]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "✅ Есть активный сигнал — мониторим"
@@ -55,5 +54,3 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           python smart_fire_spy.py
-          
-      # 💾 actions/cache автоматически сохранит обновленный last_signals.json
