@@ -48,7 +48,6 @@ class ChartVisualizer:
             if entry_level != "N/A" and fib_levels:
                 entry_float = float(entry_level)
                 tp_float = float(tp_level) if tp_level else entry_float
-                
                 risk = abs(entry_float - float(sl_level)) if sl_level else abs(entry_float - tp_float) * 0.5
                 
                 if is_long:
@@ -56,20 +55,20 @@ class ChartVisualizer:
                     tp2 = fib_levels.get('1.0', round(entry_float + (tp_float - entry_float) * 0.7, 4))
                     tp3 = fib_levels.get('1.618', tp_float)
                     
-                    # ✅ СИНХРОНИЗИРОВАНО С SIGNAL_GENERATOR: 0.7/1.1/1.5 (для 2-4 часов)
-                    if tp1 <= entry_float or (tp1 - entry_float) < (risk * 0.7):
+                    if (tp1 - entry_float) < (risk * 0.7):
                         tp1 = round(entry_float + (risk * 0.7), 4)
+                    elif (tp1 - entry_float) > (risk * 1.0):
+                        tp1 = round(entry_float + (risk * 1.0), 4)
                     
-                    if tp2 <= entry_float:
+                    if (tp2 - entry_float) < (risk * 1.1):
                         tp2 = round(entry_float + (risk * 1.1), 4)
-                    elif (tp2 - entry_float) > (risk * 1.1):
-                        tp2 = round(entry_float + (risk * 1.1), 4)
+                    elif (tp2 - entry_float) > (risk * 1.3):
+                        tp2 = round(entry_float + (risk * 1.3), 4)
                     
-                    if tp3 <= entry_float:
-                        tp3 = round(entry_float + (risk * 1.5), 4)
-                    elif (tp3 - entry_float) > (risk * 1.5):
-                        tp3 = round(entry_float + (risk * 1.5), 4)
-                        
+                    if (tp3 - entry_float) < (risk * 1.4):
+                        tp3 = round(entry_float + (risk * 1.4), 4)
+                    elif (tp3 - entry_float) > (risk * 1.6):
+                        tp3 = round(entry_float + (risk * 1.6), 4)
                 else:
                     tp1 = fib_levels.get('0.382', round(entry_float - (entry_float - tp_float) * 0.4, 4))
                     tp2 = fib_levels.get('0.0', round(entry_float - (entry_float - tp_float) * 0.7, 4))
@@ -78,18 +77,20 @@ class ChartVisualizer:
                     if tp3 == tp_float and '-0.618' not in fib_levels:
                         tp3 = round(entry_float - (entry_float - tp_float) * 1.5, 4)
                     
-                    if tp1 >= entry_float or (entry_float - tp1) < (risk * 0.7):
+                    if (entry_float - tp1) < (risk * 0.7):
                         tp1 = round(entry_float - (risk * 0.7), 4)
+                    elif (entry_float - tp1) > (risk * 1.0):
+                        tp1 = round(entry_float - (risk * 1.0), 4)
                     
-                    if tp2 >= entry_float:
+                    if (entry_float - tp2) < (risk * 1.1):
                         tp2 = round(entry_float - (risk * 1.1), 4)
-                    elif (entry_float - tp2) > (risk * 1.1):
-                        tp2 = round(entry_float - (risk * 1.1), 4)
+                    elif (entry_float - tp2) > (risk * 1.3):
+                        tp2 = round(entry_float - (risk * 1.3), 4)
                     
-                    if tp3 >= entry_float:
-                        tp3 = round(entry_float - (risk * 1.5), 4)
-                    elif (entry_float - tp3) > (risk * 1.5):
-                        tp3 = round(entry_float - (risk * 1.5), 4)
+                    if (entry_float - tp3) < (risk * 1.4):
+                        tp3 = round(entry_float - (risk * 1.4), 4)
+                    elif (entry_float - tp3) > (risk * 1.6):
+                        tp3 = round(entry_float - (risk * 1.6), 4)
                         
             elif entry_level != "N/A" and tp_level:
                 entry_float = float(entry_level)
