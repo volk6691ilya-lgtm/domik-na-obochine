@@ -18,9 +18,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 def get_anti_bot_price(price: float, symbol: str) -> float:
-    """
-    Гарантирует, что 4-й знак после запятой НИКОГДА не будет равен 0.
-    """
     base_price = round(float(price), 4)
     last_digit = int(round(base_price * 10000)) % 10
     
@@ -34,10 +31,6 @@ def get_anti_bot_price(price: float, symbol: str) -> float:
 
 
 def check_binance_volume(symbol: str, min_volume_usdt: float = 15_000_000) -> bool:
-    """
-    Быстрая проверка суточного объема торгов через Binance API.
-    Порог снижен до 15 млн для охвата перспективных альткоинов.
-    """
     try:
         url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
         response = requests.get(url, timeout=5)
@@ -58,7 +51,6 @@ BROWSER_HEADERS = {
     'Connection': 'keep-alive'
 }
 
-# ✅ ЧИСТЫЙ СПИСОК БЕЗ ПРОБЕЛОВ
 SCAN_COINS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
     "ADAUSDT", "DOGEUSDT", "TRXUSDT", "AVAXUSDT", "LINKUSDT",
@@ -74,7 +66,6 @@ SCAN_COINS = [
     "SHIBUSDT", "PEPEUSDT", "FLOKIUSDT", "WIFUSDT"
 ]
 
-# ✅ ЧИСТЫЙ СЛОВАРЬ БЕЗ ПРОБЕЛОВ
 COINGECKO_IDS = {
     "BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "BNBUSDT": "binancecoin",
     "SOLUSDT": "solana", "XRPUSDT": "ripple", "ADAUSDT": "cardano",
@@ -269,44 +260,35 @@ def evaluate_signal_quality(ta_data: dict, macro_regime: str = "", pattern_data:
     wr_aligned = (is_long and "перепроданн" in wr_status) or (not is_long and "перекупленн" in wr_status)
     strong_confirmation = bb_aligned and wr_aligned and volume_confirmed
 
-    # 🛡️ ЖЕСТКИЕ ФИЛЬТРЫ БЕЗОПАСНОСТИ (РАБОТАЮТ В ОБЕ СТОРОНЫ!)
-    
-    # 1. Блокировка ЛОНГА в режиме SHORT (паника на рынке)
+    # 🛡️ ЖЕСТКИЕ ФИЛЬТРЫ БЕЗОПАСНОСТИ
     if "🔴 SHORT" in macro_regime and is_long:
         logging.warning(f"⛔ БЛОКИРОВКА: Глобальный режим SHORT, но сигнал LONG")
         return ("low", "⚪", "Низкая вероятность — рынок в панике (SHORT режим)")
     
-    # 2. Блокировка ШОРТА в режиме LONG (рынок растет)
     if "🟢 LONG" in macro_regime and not is_long:
         logging.warning(f"⛔ БЛОКИРОВКА: Глобальный режим LONG, но сигнал SHORT")
         return ("low", "⚪", "Низкая вероятность — рынок в режиме роста (LONG)")
     
-    # 3. Блокировка при противоречивых паттернах
     if pattern_data:
         patterns = pattern_data.get('patterns', [])
         has_bullish_pattern = any('Бычий' in p or 'Двойное Дно' in p for p in patterns)
         has_bearish_pattern = any('Медвежий' in p or 'Двойная Вершина' in p for p in patterns)
         
-        # Если есть И бычий, И медвежий паттерн одновременно — это неопределенность!
         if has_bullish_pattern and has_bearish_pattern:
             logging.warning(f"⛔ БЛОКИРОВКА: Обнаружены противоречивые паттерны")
-            return ("low", "⚪", "Низкая вероятность — противоречивые паттерны (неопределенность)")
+            return ("low", "⚪", "Низкая вероятность — противоречивые паттерны")
         
-        # Если медвежий паттерн + лонг = блокировка
         if has_bearish_pattern and is_long:
             logging.warning(f"⛔ БЛОКИРОВКА: Обнаружен медвежий паттерн, но сигнал LONG")
             return ("low", "⚪", "Низкая вероятность — обнаружен медвежий паттерн разворота")
         
-        # Если бычий паттерн + шорт = блокировка
         if has_bullish_pattern and not is_long:
             logging.warning(f"⛔ БЛОКИРОВКА: Обнаружен бычий паттерн, но сигнал SHORT")
             return ("low", "⚪", "Низкая вероятность — обнаружен бычий паттерн разворота")
 
-    # 4. Если объем не подтвержден, требуем очень высокий R:R
     if not volume_confirmed and rr_value < 1.5:
         return ("low", "⚪", "Низкая вероятность — движение не подтверждено объемом")
 
-    # СТАНДАРТНАЯ ОЦЕНКА (если прошли все фильтры)
     if rr_value >= 1.3 and volume_confirmed:
         return ("high", "🟢", "Высоковероятный сигнал")
     elif rr_value >= 0.9 and strong_confirmation:
@@ -316,7 +298,7 @@ def evaluate_signal_quality(ta_data: dict, macro_regime: str = "", pattern_data:
     elif rr_value >= 1.3 and not volume_confirmed:
         return ("medium", "🟡", "Хороший R:R, но объем не подтвержден")
     else:
-        return ("low", "⚪", "Низкая вероятность — лучше воздержаться") # ✅ ИСПРАВЛЕНО: добавлен эмодзи
+        return ("low", "⚪", "Низкая вероятность — лучше воздержаться")
 
 
 def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_warning, quality_level, quality_emoji, quality_desc):
@@ -343,15 +325,11 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         logging.warning(f"⚠️ {symbol}: Риск равен 0 (Entry == SL). Невозможно рассчитать R:R. Сигнал отклонен.")
         return None
     
-    # 🔧 СВЕРХРЕАЛИСТИЧНЫЕ ЦЕЛИ TP ДЛЯ 1H ТАЙМФРЕЙМА (2-4 часа)
-    # Жесткие границы не дадут целям улететь слишком далеко или быть слишком близко
-    
     if is_long:
         tp1 = fib_levels.get('0.618', round(entry + (tp - entry) * 0.4, 4))
         tp2 = fib_levels.get('1.0', round(entry + (tp - entry) * 0.7, 4))
         tp3 = fib_levels.get('1.618', tp)
         
-        # Принудительная установка границ R:R для 2-4 часов
         if (tp1 - entry) < (risk * 0.7):
             tp1 = round(entry + (risk * 0.7), 4)
         elif (tp1 - entry) > (risk * 1.0):
@@ -366,7 +344,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
             tp3 = round(entry + (risk * 1.4), 4)
         elif (tp3 - entry) > (risk * 1.6):
             tp3 = round(entry + (risk * 1.6), 4)
-            
     else:
         tp1 = fib_levels.get('0.382', round(entry - (entry - tp) * 0.4, 4))
         tp2 = fib_levels.get('0.0', round(entry - (entry - tp) * 0.7, 4))
@@ -375,7 +352,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         if tp3 == tp and '-0.618' not in fib_levels:
             tp3 = round(entry - (entry - tp) * 1.5, 4)
         
-        # Принудительная установка границ R:R для 2-4 часов (симметрично лонгу)
         if (entry - tp1) < (risk * 0.7):
             tp1 = round(entry - (risk * 0.7), 4)
         elif (entry - tp1) > (risk * 1.0):
@@ -391,7 +367,6 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         elif (entry - tp3) > (risk * 1.6):
             tp3 = round(entry - (risk * 1.6), 4)
     
-    # Расчёт взвешенного R:R (40% на TP1, 30% на TP2, 30% на TP3)
     if is_long:
         r1, r2, r3 = tp1 - entry, tp2 - entry, tp3 - entry
     else:
@@ -405,12 +380,7 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
         return None
 
     rr_value = real_rr_value
-    
-    if sl > entry:
-        sl_text = "вырастет выше"
-    else:
-        sl_text = "упадет ниже"
-    
+    sl_text = "вырастет выше" if sl > entry else "упадет ниже"
     leverage = "2x-3x" if quality_level == "high" else "1x-2x"
     
     pattern_text = ', '.join(pattern_data['patterns'])
@@ -441,9 +411,8 @@ def generate_analysis_post(symbol, ta_data, pattern_data, macro_regime, macro_wa
     tp2_fmt = get_anti_bot_price(tp2, symbol)
     tp3_fmt = get_anti_bot_price(tp3, symbol)
 
-    # Формирование расширенного Bollinger статуса для поста
-    bb_percent_b = ta_data.get('bb_percent_b', 0.5)
-    bb_width = ta_data.get('bb_width_percent', 0)
+    bb_percent_b = ta_data.get('bb_percent_b', 0.0)
+    bb_width = ta_data.get('bb_width_percent', 0.0)
     bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
     max_fib_confluence = ta_data.get('max_fib_confluence', 0)
     
@@ -511,9 +480,7 @@ def send_to_telegram(text: str, chart_path: str, symbol: str):
     try:
         with open(chart_path, 'rb') as f:
             coin_name = symbol.replace('USDT', '')
-            short_caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n"
-            short_caption += f"🎯 Точка входа + SL/TP\n\n"
-            short_caption += f"👇 *Полный разбор с дисклеймером — в следующем сообщении*"
+            short_caption = f"📊 **ТОРГОВЫЙ СИГНАЛ: {coin_name}**\n\n🎯 Точка входа + SL/TP\n\n👇 *Полный разбор с дисклеймером — в следующем сообщении*"
             
             files = {
                 'photo': ('signal_chart.png', f, 'image/png'),
@@ -618,7 +585,6 @@ def main():
 
         pattern_data = pattern_recognizer.analyze_patterns(df)
         
-        # ✅ ПЕРЕДАЕМ regime и pattern_data в оценку качества для жестких фильтров!
         quality_level, quality_emoji, quality_desc = evaluate_signal_quality(ta_data, regime, pattern_data)
         
         if quality_level == "low":
@@ -639,7 +605,6 @@ def main():
         
         score = rr_value + (0.4 if "Да ✅" in ta_data['volume_confirmed'] else 0)
         
-        # Бонус за идеальный Squeeze + конфлюэнс
         bb_is_perfect_squeeze = ta_data.get('bb_is_perfect_squeeze', False)
         max_fib_confluence = ta_data.get('max_fib_confluence', 0)
         if bb_is_perfect_squeeze and max_fib_confluence >= 2:
